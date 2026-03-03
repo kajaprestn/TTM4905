@@ -14,13 +14,14 @@ class Incident(SQLModel, table=True):
     file_name: str
     file_hash: str
     microsoft_signature: str
-    mitre_attack: str
     quarantine_status: str
     log_source: str
     source_ip: str
     destination_ip: str
     status: str = "Open"
     logs_json: str = "[]"
+    command_line: Optional[str] = None
+    file_path: Optional[str] = None
 
     @property
     def logs(self) -> list[str]:
@@ -28,16 +29,18 @@ class Incident(SQLModel, table=True):
 
 
 class FileIntelligence(SQLModel, table=True):
-    id: int | None = Field(default=None, primary_key=True)
-    file_hash: str = Field(index=True, unique=True)
+
+    file_hash: str = Field(primary_key=True)
 
     # VirusTotal
-    vt_detection_ratio: str
-    vt_first_submission: str
-    vt_last_analysis: str
-    vt_file_type: str
+    vt_detection_ratio: Optional[str] = None
+    vt_first_submission: Optional[str] = None
+    vt_last_analysis: Optional[str] = None
+    vt_file_type: Optional[str] = None
     vt_popular_threat_labels_json: str = "[]"
-    vt_reputation_score: str
+    vt_reputation_score: Optional[str] = None
+    vt_meaningful_name: Optional[str] = None
+    vt_tags_json: str = "[]"
 
     # Microsoft Reputation
     ms_classification: str
@@ -78,6 +81,8 @@ class FileIntelligence(SQLModel, table=True):
                 "fileType": self.vt_file_type,
                 "popularThreatLabels": json.loads(self.vt_popular_threat_labels_json),
                 "reputationScore": self.vt_reputation_score,
+                "meaningfulName": self.vt_meaningful_name,
+                "tags": json.loads(self.vt_tags_json),
             },
             "microsoftReputation": {
                 "classification": self.ms_classification,
@@ -132,8 +137,6 @@ class DeviceContext(SQLModel, table=True):
     beaconing_detected: bool
     credential_dumping_detected: bool
 
-    mitre_techniques_json: str = "[]"
-
     last_seen: datetime
 
 
@@ -154,7 +157,6 @@ class UserContext(SQLModel, table=True):
     mfa_enabled: bool
 
     privileged_roles_json: str = "[]"
-    mitre_techniques_json: str = "[]"
 
     last_sign_in: datetime
 
@@ -195,8 +197,6 @@ class MalwareAnalysis(SQLModel, table=True):
     credential_access_detected: bool
     command_and_control_detected: bool
 
-    mitre_techniques_json: str = "[]"
-
     analysis_timestamp: datetime
 
 
@@ -214,6 +214,5 @@ class KQLQuery(SQLModel, table=True):
     execution_timestamp: datetime
     result_count: int
 
-    mitre_techniques_json: str = "[]"
     result_columns_json: str = "[]"
     result_rows_json: str = "[]"

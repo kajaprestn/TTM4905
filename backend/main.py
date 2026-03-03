@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
 import os
 from datetime import datetime, timezone
+from typing import Optional
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -13,7 +14,7 @@ import httpx
 from database import init_db, get_session
 from models import (
     Incident, FileIntelligence, DeviceContext, UserContext,
-    CampaignContext, MalwareAnalysis, KQLQuery,
+    CampaignContext, KQLQuery,
 )
 import json
 from seed_data import seed
@@ -43,23 +44,6 @@ app.add_middleware(
 # Helpers
 # ---------------------------------------------------------------------------
 
-def build_prompt(incident: Incident) -> str:
-    logs_block = "\n".join(incident.logs)
-    return (
-        "You are a cybersecurity analyst. "
-        "Given the following security alert and raw log data, write a short "
-        "incident summary (3-5 sentences). Include: what happened, the likely "
-        "impact, and one recommended next step.\n\n"
-        f"Alert: {incident.title}\n"
-        f"Severity: {incident.severity}\n"
-        f"Source IP: {incident.source_ip}\n"
-        f"Target: {incident.device_name}\n"
-        f"Time: {incident.detection_timestamp}\n\n"
-        f"Raw logs:\n{logs_block}\n\n"
-        "Incident summary:"
-    )
-
-
 def incident_to_api(inc: Incident) -> dict:
     """Convert an Incident row to the shape the frontend expects."""
     return {
@@ -72,12 +56,13 @@ def incident_to_api(inc: Incident) -> dict:
         "fileName": inc.file_name,
         "fileHash": inc.file_hash,
         "microsoftSignature": inc.microsoft_signature,
-        "mitreAttack": inc.mitre_attack,
         "quarantineStatus": inc.quarantine_status,
         "logSource": inc.log_source,
         "sourceIp": inc.source_ip,
         "destinationIp": inc.destination_ip,
         "status": inc.status,
+        "commandLine": inc.command_line,
+        "filePath": inc.file_path,
     }
 
 
@@ -110,31 +95,8 @@ def get_incident_logs(incident_id: str, session: Session = Depends(get_session))
     return {"incidentId": incident_id, "logs": incident.logs}
 
 
-@app.get("/api/incidents/{incident_id}/summary")
-async def get_summary(incident_id: str, session: Session = Depends(get_session)):
-    """Send incident + logs to a local LLM (Ollama) and return a summary."""
-    incident = session.get(Incident, incident_id)
-    if not incident:
-        raise HTTPException(status_code=404, detail="Incident not found")
 
-    prompt = build_prompt(incident)
-
-    async with httpx.AsyncClient(timeout=120.0) as client:
-        resp = await client.post(
-            "http://localhost:11434/api/generate",
-            json={
-                "model": "qwen2:1.5b",
-                "prompt": prompt,
-                "stream": False,
-            },
-        )
-        resp.raise_for_status()
-
-    answer = resp.json().get("response", "").strip()
-    return {"incidentId": incident_id, "summary": answer}
-
-
-async def fetch_virustotal(file_hash: str) -> FileIntelligence | None:
+async def fetch_virustotal(file_hash: str) -> Optional[FileIntelligence]:
     """Fetch file report from VirusTotal API v3 and return a FileIntelligence."""
     if not VT_API_KEY:
         return None
@@ -191,6 +153,10 @@ async def fetch_virustotal(file_hash: str) -> FileIntelligence | None:
     else:
         reputation = "Clean"
 
+    # Meaningful name and tags
+    meaningful_name = attrs.get("meaningful_name")
+    tags = attrs.get("tags", [])[:10]
+
     return FileIntelligence(
         file_hash=file_hash,
         vt_detection_ratio=detection_ratio,
@@ -199,6 +165,8 @@ async def fetch_virustotal(file_hash: str) -> FileIntelligence | None:
         vt_file_type=file_type,
         vt_popular_threat_labels_json=json.dumps(labels),
         vt_reputation_score=f"{reputation} (score: {rep_score})",
+        vt_meaningful_name=meaningful_name,
+        vt_tags_json=json.dumps(tags),
         ms_classification="N/A",
         ms_threat_family="N/A",
         ms_prevalence="N/A",
@@ -230,16 +198,65 @@ async def get_file_intelligence(file_hash: str, session: Session = Depends(get_s
         select(FileIntelligence).where(FileIntelligence.file_hash == file_hash)
     ).first()
 
-    if not fi and VT_API_KEY:
-        fi = await fetch_virustotal(file_hash)
-        if fi:
-            session.add(fi)
+    # VT caching: only fetch from VirusTotal if the hash has no cached VT data in
+    # SQLite. Subsequent requests return instantly from the DB, preserving API credits.
+    if VT_API_KEY and (not fi or fi.vt_detection_ratio is None):
+        vt_result = await fetch_virustotal(file_hash)
+        if vt_result:
+            if fi:
+                # Update existing record with VT fields
+                fi.vt_detection_ratio = vt_result.vt_detection_ratio
+                fi.vt_first_submission = vt_result.vt_first_submission
+                fi.vt_last_analysis = vt_result.vt_last_analysis
+                fi.vt_file_type = vt_result.vt_file_type
+                fi.vt_popular_threat_labels_json = vt_result.vt_popular_threat_labels_json
+                fi.vt_reputation_score = vt_result.vt_reputation_score
+                fi.vt_meaningful_name = vt_result.vt_meaningful_name
+                fi.vt_tags_json = vt_result.vt_tags_json
+            else:
+                fi = vt_result
+                session.add(fi)
             session.commit()
             session.refresh(fi)
 
     if not fi:
         raise HTTPException(status_code=404, detail="No intelligence found for this hash")
     return fi.to_api_response()
+
+
+@app.get("/api/vt-indicators/{file_hash}")
+async def get_vt_indicators(file_hash: str):
+    """Fetch related indicators (contacted IPs, bundled file hashes) from VirusTotal."""
+    if not VT_API_KEY:
+        return {"relatedIps": [], "relatedHashes": []}
+
+    related_ips = []
+    related_hashes = []
+
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        try:
+            resp = await client.get(
+                f"https://www.virustotal.com/api/v3/files/{file_hash}/contacted_ips",
+                headers={"x-apikey": VT_API_KEY},
+                params={"limit": 10},
+            )
+            if resp.status_code == 200:
+                related_ips = [item["id"] for item in resp.json().get("data", [])]
+        except httpx.HTTPError:
+            pass
+
+        try:
+            resp = await client.get(
+                f"https://www.virustotal.com/api/v3/files/{file_hash}/bundled_files",
+                headers={"x-apikey": VT_API_KEY},
+                params={"limit": 10},
+            )
+            if resp.status_code == 200:
+                related_hashes = [item["id"] for item in resp.json().get("data", [])]
+        except httpx.HTTPError:
+            pass
+
+    return {"relatedIps": related_ips, "relatedHashes": related_hashes}
 
 
 @app.get("/api/device-context/{device_name}")
@@ -264,7 +281,6 @@ def get_device_context(device_name: str, session: Session = Depends(get_session)
         "suspiciousProcessesLast24h": dc.suspicious_processes_last_24h,
         "beaconingDetected": dc.beaconing_detected,
         "credentialDumpingDetected": dc.credential_dumping_detected,
-        "mitreTechniques": json.loads(dc.mitre_techniques_json),
         "lastSeen": dc.last_seen.isoformat(),
     }
 
@@ -289,7 +305,6 @@ def get_user_context(user_principal_name: str, session: Session = Depends(get_se
         "impossibleTravelDetected": uc.impossible_travel_detected,
         "mfaEnabled": uc.mfa_enabled,
         "privilegedRoles": json.loads(uc.privileged_roles_json),
-        "mitreTechniques": json.loads(uc.mitre_techniques_json),
         "lastSignIn": uc.last_sign_in.isoformat(),
     }
 
@@ -316,27 +331,26 @@ def list_campaign_contexts(session: Session = Depends(get_session)):
     ]
 
 
-@app.get("/api/malware-analysis/{file_hash}")
-def get_malware_analysis(file_hash: str, session: Session = Depends(get_session)):
-    """Return malware analysis results for a given file hash."""
-    ma = session.exec(
-        select(MalwareAnalysis).where(MalwareAnalysis.file_hash == file_hash)
-    ).first()
-    if not ma:
-        raise HTTPException(status_code=404, detail="No malware analysis found")
-    return {
-        "fileHash": ma.file_hash,
-        "sandboxScore": ma.sandbox_score,
-        "behaviorSummary": ma.behavior_summary,
-        "processesSpawned": json.loads(ma.processes_spawned_json),
-        "registryChanges": json.loads(ma.registry_changes_json),
-        "networkConnections": json.loads(ma.network_connections_json),
-        "persistenceDetected": ma.persistence_detected,
-        "credentialAccessDetected": ma.credential_access_detected,
-        "commandAndControlDetected": ma.command_and_control_detected,
-        "mitreTechniques": json.loads(ma.mitre_techniques_json),
-        "analysisTimestamp": ma.analysis_timestamp.isoformat(),
-    }
+# @app.get("/api/malware-analysis/{file_hash}")
+# def get_malware_analysis(file_hash: str, session: Session = Depends(get_session)):
+#     """Return malware analysis results for a given file hash."""
+#     ma = session.exec(
+#         select(MalwareAnalysis).where(MalwareAnalysis.file_hash == file_hash)
+#     ).first()
+#     if not ma:
+#         raise HTTPException(status_code=404, detail="No malware analysis found")
+#     return {
+#         "fileHash": ma.file_hash,
+#         "sandboxScore": ma.sandbox_score,
+#         "behaviorSummary": ma.behavior_summary,
+#         "processesSpawned": json.loads(ma.processes_spawned_json),
+#         "registryChanges": json.loads(ma.registry_changes_json),
+#         "networkConnections": json.loads(ma.network_connections_json),
+#         "persistenceDetected": ma.persistence_detected,
+#         "credentialAccessDetected": ma.credential_access_detected,
+#         "commandAndControlDetected": ma.command_and_control_detected,
+#         "analysisTimestamp": ma.analysis_timestamp.isoformat(),
+#     }
 
 
 @app.get("/api/kql-queries/{entity_type}/{entity_id:path}")
@@ -357,7 +371,6 @@ def get_kql_queries(entity_type: str, entity_id: str, session: Session = Depends
             "relatedEntityId": q.related_entity_id,
             "executionTimestamp": q.execution_timestamp.isoformat(),
             "resultCount": q.result_count,
-            "mitreTechniques": json.loads(q.mitre_techniques_json),
             "resultColumns": json.loads(q.result_columns_json),
             "resultRows": json.loads(q.result_rows_json),
         }
