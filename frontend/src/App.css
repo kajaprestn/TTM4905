@@ -935,6 +935,15 @@
 .quarantine-status--fail .quarantine-icon { color: #e05252; }
 .quarantine-status--pending .quarantine-icon { color: #e6be50; }
 
+.quarantine-heading {
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-label);
+  margin-bottom: 0.25rem;
+}
+
 .quarantine-label {
   font-size: 0.78rem;
   text-align: center;
@@ -944,6 +953,8 @@
 
 /* ---- File path suspicious highlighting ---- */
 .filepath-wrap {
+  display: flex;
+  flex-direction: column;
   font-family: "SF Mono", "Fira Code", "Consolas", monospace;
   font-size: 0.78rem;
   color: var(--color-text);
@@ -969,6 +980,31 @@
   color: #e8845c;
   font-family: system-ui, sans-serif;
   vertical-align: middle;
+}
+
+.filepath-sus-reasons {
+  margin: 0.35rem 0 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.filepath-sus-reasons li {
+  font-family: system-ui, sans-serif;
+  font-size: 0.7rem;
+  color: #e8845c;
+  padding-left: 0.9rem;
+  position: relative;
+  line-height: 1.4;
+}
+
+.filepath-sus-reasons li::before {
+  content: "–";
+  position: absolute;
+  left: 0;
+  color: rgba(232,132,92,0.6);
 }
 
 /* ---- Threat type chip ---- */
@@ -1167,6 +1203,101 @@
   border-radius: 3px;
   color: var(--color-label);
 }
+
+.argus-hash-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+}
+
+.argus-hash-table th {
+  text-align: left;
+  font-weight: 600;
+  color: var(--color-label);
+  padding: 0.35rem 0.75rem;
+  border-bottom: 1px solid var(--color-border);
+  white-space: nowrap;
+}
+
+.argus-hash-table td {
+  padding: 0.35rem 0.75rem;
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text);
+}
+
+.argus-hash-table tr:last-child td {
+  border-bottom: none;
+}
+
+.argus-hash-link {
+  font-family: "SF Mono", "Fira Code", monospace;
+  color: var(--color-text);
+  text-decoration: none;
+}
+
+.argus-hash-link:hover {
+  text-decoration: underline;
+}
+
+/* ---- IP reputation tooltips ---- */
+.ip-tooltip-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
+.ip-tooltip {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  background: #1c1c1c;
+  border: 1px solid #333;
+  border-radius: 6px;
+  padding: 8px 10px;
+  min-width: 190px;
+  z-index: 100;
+  font-size: 0.75rem;
+  line-height: 1.6;
+  white-space: nowrap;
+  pointer-events: none;
+  font-family: inherit;
+}
+
+.ip-tooltip-wrapper:hover .ip-tooltip {
+  display: block;
+}
+
+.ipt-row {
+  color: #ccc;
+}
+
+.ipt-muted {
+  color: #666;
+  font-size: 0.72rem;
+}
+
+.ipt-tags {
+  display: flex;
+  gap: 4px;
+  margin-top: 5px;
+  flex-wrap: wrap;
+}
+
+.ipt-tag {
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
+.ipt-tag.tor     { background: #5a1010; color: #ff9999; }
+.ipt-tag.proxy   { background: #3a2a00; color: #ffcc44; }
+.ipt-tag.hosting { background: #12253a; color: #7aaedd; }
+
+/* Risk-level border tint on IP chips */
+.ip-chip[data-risk="high"]   { border-color: #7a2020 !important; color: #ff8888 !important; }
+.ip-chip[data-risk="medium"] { border-color: #6a4a00 !important; color: #ffbb44 !important; }
 
 
 /* ---- Widget drag-and-drop ---- */

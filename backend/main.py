@@ -11,21 +11,257 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import Session, select
 import httpx
 
-from database import init_db, get_session
+from database import init_db, migrate_db, get_session
 from models import (
-    Incident, FileIntelligence, DeviceContext, UserContext,
+    Incident, Tenant, FileIntelligence, DeviceContext, UserContext,
     CampaignContext, KQLQuery,
 )
+from mde_ingest import get_mde_token, fetch_mde_alerts, map_alert_to_incident
 import json
 from seed_data import seed
 
-VT_API_KEY = os.environ.get("VT_API_KEY", "")
+VT_API_KEY        = os.environ.get("VT_API_KEY", "")
+ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
+ABUSEIPDB_API_KEY = os.environ.get("ABUSEIPDB_API_KEY", "")
+IPDATA_API_KEY    = os.environ.get("IPDATA_API_KEY", "")
+AZURE_CLIENT_ID     = os.environ.get("AZURE_CLIENT_ID", "")
+AZURE_CLIENT_SECRET = os.environ.get("AZURE_CLIENT_SECRET", "")
+
+import asyncio
+
+# ---------------------------------------------------------------------------
+# IP reputation helpers (AbuseIPDB, ip-api.com, ExoneraTor, ipdata.co)
+# ---------------------------------------------------------------------------
+
+_ip_cache: dict[str, dict] = {}
+_tor_exit_nodes: set[str] = set()
+_tor_loaded = False
+
+
+async def _load_tor_exit_nodes() -> None:
+    global _tor_loaded
+    if _tor_loaded:
+        return
+    try:
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            r = await client.get("https://check.torproject.org/torbulkexitlist")
+            r.raise_for_status()
+            for line in r.text.splitlines():
+                line = line.strip()
+                if line and not line.startswith("#"):
+                    _tor_exit_nodes.add(line)
+    except Exception:
+        pass
+    _tor_loaded = True
+
+
+async def _fetch_abuseipdb(ip: str) -> dict:
+    if not ABUSEIPDB_API_KEY:
+        return {}
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            r = await client.get(
+                "https://api.abuseipdb.com/api/v2/check",
+                headers={"Key": ABUSEIPDB_API_KEY, "Accept": "application/json"},
+                params={"ipAddress": ip, "maxAgeInDays": 90},
+            )
+            if r.status_code != 200:
+                return {}
+            d = r.json().get("data", {})
+            return {
+                "abuseScore": d.get("abuseConfidenceScore"),
+                "countryCode": d.get("countryCode"),
+                "isp": d.get("isp"),
+                "usageType": d.get("usageType"),
+                "totalReports": d.get("totalReports", 0),
+                "isWhitelisted": d.get("isWhitelisted", False),
+            }
+    except Exception:
+        return {}
+
+
+async def _fetch_ipapi(ip: str) -> dict:
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            r = await client.get(
+                f"http://ip-api.com/json/{ip}",
+                params={"fields": "status,country,countryCode,isp,org,proxy,hosting"},
+            )
+            if r.status_code != 200:
+                return {}
+            d = r.json()
+            if d.get("status") != "success":
+                return {}
+            return {
+                "country": d.get("country"),
+                "countryCode": d.get("countryCode"),
+                "isp": d.get("isp") or d.get("org"),
+                "isProxy": d.get("proxy", False),
+                "isHosting": d.get("hosting", False),
+            }
+    except Exception:
+        return {}
+
+
+async def _check_tor(ip: str) -> dict:
+    await _load_tor_exit_nodes()
+    return {"isTor": ip in _tor_exit_nodes}
+
+
+async def _fetch_ipdata(ip: str) -> dict:
+    if not IPDATA_API_KEY:
+        return {}
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            r = await client.get(
+                f"https://api.ipdata.co/{ip}",
+                params={"api-key": IPDATA_API_KEY},
+            )
+            if r.status_code != 200:
+                return {}
+            d = r.json()
+            threat = d.get("threat", {})
+            asn = d.get("asn", {})
+            return {
+                "isTor": threat.get("is_tor", False),
+                "isProxy": threat.get("is_proxy", False),
+                "isDatacenter": threat.get("is_datacenter", False),
+                "asnName": asn.get("name"),
+            }
+    except Exception:
+        return {}
+
+
+def _merge_ip_results(ip: str, abuse: dict, ipapi: dict, tor: dict, ipdata: dict) -> dict:
+    result: dict = {"ip": ip, "sources": []}
+    # Country / ISP: prefer AbuseIPDB, fall back to ip-api
+    result["countryCode"] = abuse.get("countryCode") or ipapi.get("countryCode")
+    result["country"] = ipapi.get("country")
+    result["isp"] = abuse.get("isp") or ipapi.get("isp") or ipdata.get("asnName")
+    result["usageType"] = abuse.get("usageType")
+    # Abuse score
+    result["abuseScore"] = abuse.get("abuseScore")
+    result["totalReports"] = abuse.get("totalReports", 0)
+    result["isWhitelisted"] = abuse.get("isWhitelisted", False)
+    # Threat flags: OR across sources
+    result["isTor"]     = tor.get("isTor", False) or ipdata.get("isTor", False)
+    result["isProxy"]   = ipapi.get("isProxy", False) or ipdata.get("isProxy", False)
+    result["isHosting"] = ipapi.get("isHosting", False) or ipdata.get("isDatacenter", False)
+    # Track which sources contributed
+    if abuse:
+        result["sources"].append("abuseipdb")
+    if ipapi:
+        result["sources"].append("ip-api")
+    if tor:
+        result["sources"].append("exonerator")
+    if ipdata:
+        result["sources"].append("ipdata")
+    return result
+
+
+# ---------------------------------------------------------------------------
+# MITRE ATT&CK + Claude description helpers
+# ---------------------------------------------------------------------------
+
+_desc_cache: dict[str, str] = {}
+_mitre_index: dict[str, str] = {}  # lowercase name/alias → description
+_mitre_loaded = False
+
+
+def _extract_software_name(family: str) -> str:
+    """Extract specific software name from a threat family string.
+
+    Examples:
+      "Trojan:Win32/Mimikatz.A" → "Mimikatz"
+      "HackTool:Win32/PsExec"  → "PsExec"
+      "Ransom:Win32/LockBit.A" → "LockBit"
+    """
+    if "/" in family:
+        raw = family.split("/")[-1]
+        return raw.split(".")[0]
+    if ":" in family:
+        return family.split(":")[1] if len(family.split(":")) > 1 else family
+    return family
+
+
+MITRE_CTI_URL = (
+    "https://raw.githubusercontent.com/mitre/cti/master"
+    "/enterprise-attack/enterprise-attack.json"
+)
+
+
+async def _load_mitre_index() -> None:
+    global _mitre_loaded
+    if _mitre_loaded:
+        return
+    try:
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            r = await client.get(MITRE_CTI_URL)
+            r.raise_for_status()
+            bundle = r.json()
+        for obj in bundle.get("objects", []):
+            if obj.get("type") not in ("malware", "tool"):
+                continue
+            desc = obj.get("description", "")
+            if not desc:
+                continue
+            _mitre_index[obj["name"].lower()] = desc
+            for alias in obj.get("x_mitre_aliases", []):
+                _mitre_index[alias.lower()] = desc
+    except Exception:
+        pass  # Silently fall through to Claude / generic fallback
+    _mitre_loaded = True
+
+
+async def _mitre_description(software_name: str) -> Optional[str]:
+    await _load_mitre_index()
+    # Strip file extension (e.g. "mimikatz.exe" → "mimikatz")
+    base = software_name.lower()
+    if "." in base:
+        base = base.rsplit(".", 1)[0]
+    # Exact match first
+    if base in _mitre_index:
+        return _mitre_index[base]
+    if software_name.lower() in _mitre_index:
+        return _mitre_index[software_name.lower()]
+    # Word-boundary match: candidate must appear as a whole word within an indexed name.
+    # Never check indexed-in-candidate — short names like "at" would match "mimikatz.exe".
+    import re
+    pattern = re.compile(r'\b' + re.escape(base) + r'\b')
+    for indexed, desc in _mitre_index.items():
+        if pattern.search(indexed):
+            return desc
+    return None
+
+
+async def _claude_description(category: str, software_name: str) -> str:
+    if not ANTHROPIC_API_KEY:
+        return f"Detected as {category} category threat based on behavioral and static analysis."
+    try:
+        import anthropic
+        client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+        msg = client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=200,
+            messages=[{
+                "role": "user",
+                "content": (
+                    f"In 2-3 sentences, describe the cybersecurity threat '{software_name}' "
+                    f"(category: {category}). Focus on what it does and why it's dangerous. "
+                    "Be factual and concise."
+                ),
+            }],
+        )
+        return msg.content[0].text
+    except Exception:
+        return f"Detected as {category} category threat based on behavioral and static analysis."
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Initialise DB and seed synthetic data on startup."""
+    """Initialise DB, run migrations, and seed synthetic data on startup."""
     init_db()
+    migrate_db()
     seed()
     yield
 
@@ -63,12 +299,52 @@ def incident_to_api(inc: Incident) -> dict:
         "status": inc.status,
         "commandLine": inc.command_line,
         "filePath": inc.file_path,
+        "tenantId": inc.tenant_id,
+        "mdeAlertId": inc.mde_alert_id,
+        "mdeIncidentId": inc.mde_incident_id,
+        "description": inc.description,
+        "mitreTechniques": json.loads(inc.mitre_techniques_json or "[]"),
     }
 
 
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
+
+@app.get("/api/threat-description")
+async def get_threat_description(family: str, hints: str = ""):
+    """Return a description for a threat family string, sourced from MITRE ATT&CK or Claude.
+
+    hints: comma-separated list of additional name candidates (e.g. VT meaningful name, labels).
+    """
+    if not family or family == "N/A":
+        raise HTTPException(status_code=400, detail="No family provided")
+
+    cache_key = f"{family}|{hints}"
+    if cache_key in _desc_cache:
+        return {"description": _desc_cache[cache_key]}
+
+    category = family.split(":")[0]
+    software_name = _extract_software_name(family)
+
+    # Build candidate list: hints first (more specific), then signature-derived name
+    candidates = [h.strip() for h in hints.split(",") if h.strip()]
+    candidates.append(software_name)
+
+    desc = None
+    for candidate in candidates:
+        desc = await _mitre_description(candidate)
+        if desc:
+            break
+
+    if not desc:
+        # Use the most specific name available for Claude
+        best_name = candidates[0] if candidates else software_name
+        desc = await _claude_description(category, best_name)
+
+    _desc_cache[cache_key] = desc
+    return {"description": desc}
+
 
 @app.get("/api/incidents")
 def list_incidents(session: Session = Depends(get_session)):
@@ -117,7 +393,7 @@ async def fetch_virustotal(file_hash: str) -> Optional[FileIntelligence]:
     # Detection ratio
     stats = attrs.get("last_analysis_stats", {})
     malicious = stats.get("malicious", 0)
-    total = sum(stats.values()) if stats else 0
+    total = sum(stats.get(k, 0) for k in ("malicious", "suspicious", "undetected", "harmless"))
     detection_ratio = f"{malicious}/{total} vendors"
 
     # Timestamps
@@ -232,6 +508,24 @@ async def get_vt_indicators(file_hash: str):
 
     related_ips = []
     related_hashes = []
+    execution_parents = []
+
+    def _parse_file_item(item: dict) -> dict:
+        attrs = item.get("attributes", {})
+        stats = attrs.get("last_analysis_stats", {})
+        total = sum(stats.get(k, 0) for k in ("malicious", "suspicious", "undetected", "harmless"))
+        malicious = stats.get("malicious", 0) + stats.get("suspicious", 0)
+        ts = attrs.get("last_analysis_date")
+        names = attrs.get("names") or []
+        name = names[0] if names else attrs.get("meaningful_name")
+        return {
+            "hash": item["id"],
+            "lastAnalysis": datetime.fromtimestamp(ts, tz=timezone.utc).strftime("%Y-%m-%d") if ts else None,
+            "detections": malicious,
+            "totalEngines": total,
+            "fileType": attrs.get("type_description"),
+            "name": name,
+        }
 
     async with httpx.AsyncClient(timeout=30.0) as client:
         try:
@@ -252,11 +546,59 @@ async def get_vt_indicators(file_hash: str):
                 params={"limit": 10},
             )
             if resp.status_code == 200:
-                related_hashes = [item["id"] for item in resp.json().get("data", [])]
+                related_hashes = [_parse_file_item(i) for i in resp.json().get("data", [])]
         except httpx.HTTPError:
             pass
 
-    return {"relatedIps": related_ips, "relatedHashes": related_hashes}
+        try:
+            resp = await client.get(
+                f"https://www.virustotal.com/api/v3/files/{file_hash}/execution_parents",
+                headers={"x-apikey": VT_API_KEY},
+                params={"limit": 20},
+            )
+            if resp.status_code == 200:
+                for item in resp.json().get("data", []):
+                    parsed = _parse_file_item(item)
+                    # Only include entries with a real name (skip hash-only entries)
+                    name = parsed.get("name") or ""
+                    if name and not name.startswith("fil") and len(name) < 80:
+                        execution_parents.append(parsed)
+                        if len(execution_parents) >= 5:
+                            break
+        except httpx.HTTPError:
+            pass
+
+    return {"relatedIps": related_ips, "relatedHashes": related_hashes, "executionParents": execution_parents}
+
+
+@app.get("/api/ip-reputation")
+async def get_ip_reputation(ips: str):
+    """Return reputation data for a comma-separated list of IPs (max 10)."""
+    ip_list = list(dict.fromkeys(i.strip() for i in ips.split(",") if i.strip()))[:10]
+    if not ip_list:
+        return {"results": {}}
+
+    results = {}
+    uncached = [ip for ip in ip_list if ip not in _ip_cache]
+
+    if uncached:
+        async def enrich(ip: str) -> tuple[str, dict]:
+            abuse, ipapi, tor, ipdata = await asyncio.gather(
+                _fetch_abuseipdb(ip),
+                _fetch_ipapi(ip),
+                _check_tor(ip),
+                _fetch_ipdata(ip),
+            )
+            return ip, _merge_ip_results(ip, abuse, ipapi, tor, ipdata)
+
+        enriched = await asyncio.gather(*[enrich(ip) for ip in uncached])
+        for ip, rep in enriched:
+            _ip_cache[ip] = rep
+
+    for ip in ip_list:
+        results[ip] = _ip_cache[ip]
+
+    return {"results": results}
 
 
 @app.get("/api/device-context/{device_name}")
@@ -376,3 +718,128 @@ def get_kql_queries(entity_type: str, entity_id: str, session: Session = Depends
         }
         for q in queries
     ]
+
+
+# ---------------------------------------------------------------------------
+# Tenant management
+# ---------------------------------------------------------------------------
+
+def tenant_to_api(t: Tenant) -> dict:
+    return {
+        "id": t.id,
+        "tenantId": t.tenant_id,
+        "displayName": t.display_name,
+        "hasOwnCredentials": bool(t.client_id),
+        "isActive": t.is_active,
+        "lastSyncedAt": t.last_synced_at.isoformat() if t.last_synced_at else None,
+    }
+
+
+@app.get("/api/tenants")
+def list_tenants(session: Session = Depends(get_session)):
+    return [tenant_to_api(t) for t in session.exec(select(Tenant)).all()]
+
+
+@app.post("/api/tenants", status_code=201)
+def create_tenant(body: dict, session: Session = Depends(get_session)):
+    """Register a tenant. client_id/client_secret are optional if a shared
+    app registration is configured via AZURE_CLIENT_ID/AZURE_CLIENT_SECRET."""
+    if not body.get("tenantId") or not body.get("displayName"):
+        raise HTTPException(status_code=400, detail="tenantId and displayName are required")
+    existing = session.exec(
+        select(Tenant).where(Tenant.tenant_id == body["tenantId"])
+    ).first()
+    if existing:
+        raise HTTPException(status_code=409, detail="Tenant already registered")
+    tenant = Tenant(
+        tenant_id=body["tenantId"],
+        display_name=body["displayName"],
+        client_id=body.get("clientId"),
+        client_secret=body.get("clientSecret"),
+    )
+    session.add(tenant)
+    session.commit()
+    session.refresh(tenant)
+    return tenant_to_api(tenant)
+
+
+@app.delete("/api/tenants/{tenant_id}", status_code=204)
+def delete_tenant(tenant_id: int, session: Session = Depends(get_session)):
+    tenant = session.get(Tenant, tenant_id)
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+    session.delete(tenant)
+    session.commit()
+
+
+# ---------------------------------------------------------------------------
+# MDE alert sync
+# ---------------------------------------------------------------------------
+
+async def _sync_tenant(tenant: Tenant, session: Session, lookback_hours: int) -> dict:
+    """Fetch MDE alerts for one tenant and upsert into the incidents table."""
+    client_id     = tenant.client_id     or AZURE_CLIENT_ID
+    client_secret = tenant.client_secret or AZURE_CLIENT_SECRET
+    if not client_id or not client_secret:
+        raise HTTPException(
+            status_code=400,
+            detail=f"No credentials for tenant '{tenant.display_name}'. "
+                   "Set clientId/clientSecret on the tenant or configure "
+                   "AZURE_CLIENT_ID/AZURE_CLIENT_SECRET env vars.",
+        )
+
+    token  = await get_mde_token(tenant.tenant_id, client_id, client_secret)
+    alerts = await fetch_mde_alerts(token, lookback_hours=lookback_hours)
+
+    new_count = updated_count = 0
+    for alert in alerts:
+        fields = map_alert_to_incident(alert)
+        existing = session.get(Incident, fields["id"])
+        if existing:
+            existing.status              = fields["status"]
+            existing.quarantine_status   = fields["quarantine_status"]
+            existing.detection_timestamp = fields["detection_timestamp"]
+            session.add(existing)
+            updated_count += 1
+        else:
+            session.add(Incident(**fields))
+            new_count += 1
+
+    from datetime import datetime, timezone
+    tenant.last_synced_at = datetime.now(timezone.utc)
+    session.add(tenant)
+    session.commit()
+
+    return {"tenant": tenant.display_name, "new": new_count, "updated": updated_count}
+
+
+@app.post("/api/tenants/{tenant_id}/sync")
+async def sync_tenant(
+    tenant_id: int,
+    lookback_hours: int = 168,
+    session: Session = Depends(get_session),
+):
+    """Pull MDE alerts for a single tenant (default: last 7 days)."""
+    tenant = session.get(Tenant, tenant_id)
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+    return await _sync_tenant(tenant, session, lookback_hours)
+
+
+@app.post("/api/sync-all")
+async def sync_all_tenants(
+    lookback_hours: int = 168,
+    session: Session = Depends(get_session),
+):
+    """Pull MDE alerts for all active tenants."""
+    tenants = session.exec(select(Tenant).where(Tenant.is_active == True)).all()
+    if not tenants:
+        return {"results": [], "message": "No active tenants registered"}
+    results = []
+    for tenant in tenants:
+        try:
+            result = await _sync_tenant(tenant, session, lookback_hours)
+            results.append(result)
+        except Exception as e:
+            results.append({"tenant": tenant.display_name, "error": str(e)})
+    return {"results": results}

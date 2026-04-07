@@ -4,6 +4,16 @@ from datetime import datetime
 import json
 
 
+class Tenant(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    tenant_id: str = Field(index=True, unique=True)   # Azure AD tenant GUID
+    display_name: str
+    client_id: Optional[str] = None       # If None, falls back to AZURE_CLIENT_ID env var
+    client_secret: Optional[str] = None   # If None, falls back to AZURE_CLIENT_SECRET env var
+    is_active: bool = True
+    last_synced_at: Optional[datetime] = None
+
+
 class Incident(SQLModel, table=True):
     id: str = Field(primary_key=True)
     title: str
@@ -22,6 +32,12 @@ class Incident(SQLModel, table=True):
     logs_json: str = "[]"
     command_line: Optional[str] = None
     file_path: Optional[str] = None
+    # MDE / multi-tenant fields (optional for backward compat with seed data)
+    tenant_id: Optional[str] = None
+    mde_alert_id: Optional[str] = None
+    mde_incident_id: Optional[str] = None
+    description: Optional[str] = None
+    mitre_techniques_json: str = "[]"
 
     @property
     def logs(self) -> list[str]:

@@ -7,24 +7,9 @@ const API = "http://localhost:8000";
 // --- Widget order ---
 const DEFAULT_WIDGET_ORDER = ["vt", "verdict", "file", "obs", "device", "user", "argus", "kql"];
 
-// --- Threat type lookup ---
-const THREAT_DESCRIPTIONS = {
-  Trojan: "A Trojan disguises itself as legitimate software to gain unauthorized access. Common behaviors include backdoor installation, credential harvesting, C2 communication, and dropping secondary payloads.",
-  Ransom: "Ransomware encrypts victim files and demands payment for decryption. Modern variants also exfiltrate data before encryption (double extortion). Recovery without offline backups is typically not possible.",
-  Worm: "A network worm self-replicates across systems by exploiting vulnerabilities without user interaction. It can rapidly spread across an entire subnet and deliver additional payloads to each compromised host.",
-  HackTool: "A dual-use administration tool that can be legitimately used by IT staff but is frequently abused by attackers for lateral movement, remote execution, and privilege escalation.",
-  Behavior: "A suspicious behavioral pattern was detected, consistent with malicious activity based on dynamic analysis of process actions, API calls, and network behavior.",
-};
-
 function getThreatType(family) {
   if (!family || family === "N/A") return null;
   return family.split(":")[0];
-}
-
-function getThreatDescription(family) {
-  const type = getThreatType(family);
-  if (!type) return null;
-  return THREAT_DESCRIPTIONS[type] || `Detected as ${type} category threat based on behavioral and static analysis.`;
 }
 
 // --- Small reusable components ---
@@ -79,35 +64,51 @@ function QuarantineStatus({ status }) {
   else if (lower.startsWith("failed") || lower.includes("failed")) { variant = "fail"; icon = "✕"; }
   return (
     <div className={`quarantine-status quarantine-status--${variant}`}>
+      <span className="quarantine-heading">Quarantine</span>
       <span className="quarantine-icon">{icon}</span>
       <span className="quarantine-label">{status}</span>
     </div>
   );
 }
 
-const SUSPICIOUS_SEGS = ["temp", "tmp", "appdata", "cache", "downloads", "public", "recycle", "programdata"];
-const SUSPICIOUS_DRIVE = /^[d-z]:$/i;
+const SUSPICIOUS_PATH_RULES = [
+  { test: (seg, i) => i === 0 && /^[d-z]:$/i.test(seg),  reason: "Non-system drive: execution from secondary or removable drives is uncommon for legitimate software" },
+  { test: (seg) => /\b(temp|tmp)\b/i.test(seg),          reason: "Temporary directory: commonly used to stage and execute malware without leaving traces in standard locations" },
+  { test: (seg) => /appdata/i.test(seg),                 reason: "AppData: frequently targeted by malware for persistence and stealthy payload storage" },
+  { test: (seg) => /\bcache\b/i.test(seg),               reason: "Cache directory: execution from here is unusual and may indicate stealth or injection techniques" },
+  { test: (seg) => /\bdownloads?\b/i.test(seg),          reason: "Downloads folder: a common initial access vector for phishing-delivered payloads" },
+  { test: (seg) => /\bpublic\b/i.test(seg),              reason: "Public directory: world-writable, commonly abused for lateral movement and payload drops" },
+  { test: (seg) => /recycle/i.test(seg),                 reason: "Recycle Bin: executing from here is a strong indicator of malicious activity" },
+  { test: (seg) => /programdata/i.test(seg),             reason: "ProgramData: abused by malware for persistence, often less monitored than Program Files" },
+];
 
 function SuspiciousPath({ path }) {
   if (!path) return <span style={{ color: "var(--color-label)" }}>—</span>;
   const parts = path.split(/[\\\/]/);
-  const hasSus = parts.some((p, i) => {
-    const lo = p.toLowerCase();
-    return SUSPICIOUS_SEGS.some(s => lo.includes(s)) || (i === 0 && SUSPICIOUS_DRIVE.test(p));
+
+  const reasons = [];
+  const segSus = parts.map((part, i) => {
+    const matched = SUSPICIOUS_PATH_RULES.filter(r => r.test(part, i));
+    matched.forEach(r => { if (!reasons.includes(r.reason)) reasons.push(r.reason); });
+    return matched.length > 0;
   });
+
   return (
     <span className="filepath-wrap">
-      {parts.map((part, i) => {
-        const lo = part.toLowerCase();
-        const isSus = SUSPICIOUS_SEGS.some(s => lo.includes(s)) || (i === 0 && SUSPICIOUS_DRIVE.test(part));
-        return (
+      <span>
+        {parts.map((part, i) => (
           <span key={i}>
             {i > 0 && <span style={{ color: "var(--color-label)" }}>\</span>}
-            <span className={isSus ? "filepath-segment--sus" : ""}>{part}</span>
+            <span className={segSus[i] ? "filepath-segment--sus" : ""}>{part}</span>
           </span>
-        );
-      })}
-      {hasSus && <span className="filepath-sus-tag">⚠ Suspicious</span>}
+        ))}
+        {reasons.length > 0 && <span className="filepath-sus-tag">⚠</span>}
+      </span>
+      {reasons.length > 0 && (
+        <ul className="filepath-sus-reasons">
+          {reasons.map((r, i) => <li key={i}>{r}</li>)}
+        </ul>
+      )}
     </span>
   );
 }
@@ -224,8 +225,9 @@ function StatRow({ label, value }) {
   );
 }
 
-function BoolValue({ value }) {
-  return <span className={value ? "bool-yes" : "bool-no"}>{value ? "Yes" : "No"}</span>;
+function BoolValue({ value, positive = false }) {
+  const bad = positive ? !value : value;
+  return <span className={bad ? "bool-yes" : "bool-no"}>{value ? "Yes" : "No"}</span>;
 }
 
 // --- KQL Queries widget content ---
@@ -448,16 +450,72 @@ function IncidentDashboard({ incident, sectionChecks, onToggleSection, onNavigat
     queryKey: ["vt-indicators", fileHash],
     queryFn: async () => {
       const res = await fetch(`${API}/api/vt-indicators/${fileHash}`);
-      if (!res.ok) return { relatedIps: [], relatedHashes: [] };
+      if (!res.ok) return { relatedIps: [], relatedHashes: [], executionParents: [] };
       return res.json();
     },
     enabled: !!fileHash,
   });
 
+  const campaign = campaigns[0];
+  const ipList = [...new Set([
+    ...(vtInd?.relatedIps || []),
+    ...(campaign?.relatedIps || []),
+  ])].slice(0, 8);
+
+  const { data: ipRepData } = useQuery({
+    queryKey: ["ip-reputation", ipList.join(",")],
+    queryFn: async () => {
+      if (!ipList.length) return { results: {} };
+      const resp = await fetch(
+        `${API}/api/ip-reputation?ips=${encodeURIComponent(ipList.join(","))}`
+      );
+      return resp.json();
+    },
+    enabled: ipList.length > 0,
+    staleTime: 1000 * 60 * 30,
+  });
+  const ipRep = ipRepData?.results ?? {};
+
   const threatFamily = fi?.microsoftReputation?.threatFamily || incident.microsoftSignature;
   const threatType = getThreatType(threatFamily);
-  const threatDesc = getThreatDescription(threatFamily);
-  const campaign = campaigns[0];
+
+  const vtHints = [
+    fi?.virusTotal?.meaningfulName,
+    ...(fi?.virusTotal?.popularThreatLabels ?? []),
+  ].filter(Boolean);
+
+  const { data: descData } = useQuery({
+    queryKey: ["threat-description", threatFamily, vtHints.join(",")],
+    queryFn: async () => {
+      if (!threatFamily || threatFamily === "N/A") return null;
+      const params = new URLSearchParams({ family: threatFamily });
+      if (vtHints.length) params.set("hints", vtHints.join(","));
+      const resp = await fetch(`${API}/api/threat-description?${params}`);
+      return resp.json();
+    },
+    enabled: !!threatFamily && threatFamily !== "N/A",
+    staleTime: Infinity,
+  });
+  const threatDesc = descData?.description ?? null;
+
+  // --- IP reputation helpers ---
+  function abuseColor(score) {
+    if (score >= 75) return "#ff4444";
+    if (score >= 25) return "#ffaa00";
+    return "#aaa";
+  }
+  function getRiskLevel(rep) {
+    if (!rep) return null;
+    if (rep.abuseScore >= 75 || rep.isTor) return "high";
+    if (rep.abuseScore >= 25 || rep.isProxy) return "medium";
+    return "low";
+  }
+  function countryFlag(code) {
+    if (!code || code.length !== 2) return "";
+    return String.fromCodePoint(
+      ...code.toUpperCase().split("").map(c => 0x1F1E0 - 65 + c.charCodeAt(0))
+    );
+  }
 
   // --- Widget content renderers ---
   function renderVT() {
@@ -527,7 +585,7 @@ function IncidentDashboard({ incident, sectionChecks, onToggleSection, onNavigat
         </div>
         <div className="stat-row" style={{ flexDirection: "column", alignItems: "flex-start", gap: "0.3rem" }}>
           <span className="stat-label">Command line</span>
-          <span className="stat-value" style={{ fontFamily: "monospace", fontSize: "0.78rem" }}>{incident.commandLine || "—"}</span>
+          <span className="stat-value" style={{ fontFamily: "monospace", fontSize: "0.78rem", textAlign: "left" }}>{incident.commandLine || "—"}</span>
         </div>
         <div className="stat-row" style={{ flexDirection: "column", alignItems: "flex-start", gap: "0.3rem" }}>
           <span className="stat-label">File hash (SHA-256)</span>
@@ -615,11 +673,11 @@ function IncidentDashboard({ incident, sectionChecks, onToggleSection, onNavigat
         <StatRow label="Failed logins (24h)" value={String(uc.failedLoginsLast24h)} />
         <div className="stat-row">
           <span className="stat-label">MFA enabled</span>
-          <BoolValue value={uc.mfaEnabled} />
+          <BoolValue value={uc.mfaEnabled} positive />
         </div>
         <div className="stat-row">
           <span className="stat-label">Account enabled</span>
-          <BoolValue value={uc.accountEnabled} />
+          <BoolValue value={uc.accountEnabled} positive />
         </div>
         <div className="stat-row">
           <span className="stat-label">Impossible travel</span>
@@ -665,28 +723,109 @@ function IncidentDashboard({ incident, sectionChecks, onToggleSection, onNavigat
         </div>
         <div style={{ display: "flex", gap: "2.5rem", flexWrap: "wrap" }}>
           {vtInd?.relatedHashes?.length > 0 && (
-            <div>
+            <div style={{ width: "100%" }}>
               <div className="argus-cell-label" style={{ marginBottom: "0.4rem" }}>Related hashes (VT)</div>
-              <div className="argus-hashes">
-                {vtInd.relatedHashes.slice(0, 6).map(h => (
-                  <a key={h} className="argus-hash" href={`https://www.virustotal.com/gui/file/${h}`} target="_blank" rel="noreferrer" style={{ textDecoration: "none", cursor: "pointer" }}>
-                    {h.slice(0, 16)}…
-                  </a>
-                ))}
+              <table className="argus-hash-table">
+                <thead>
+                  <tr>
+                    <th>Scanned</th>
+                    <th>Detections</th>
+                    <th>File type</th>
+                    <th>Name</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {vtInd.relatedHashes.slice(0, 10).map(h => {
+                    const hash = h.hash ?? h;
+                    const detections = h.detections ?? null;
+                    const total = h.totalEngines ?? null;
+                    const detColor = detections > 0 ? "#e05c5c" : detections === 0 ? "#4caf50" : "inherit";
+                    return (
+                      <tr key={hash}>
+                        <td>{h.lastAnalysis ?? "—"}</td>
+                        <td style={{ color: detColor }}>
+                          {detections !== null ? `${detections} / ${total}` : "—"}
+                        </td>
+                        <td>{h.fileType ?? "—"}</td>
+                        <td>
+                          <a className="argus-hash-link" href={`https://www.virustotal.com/gui/file/${hash}`} target="_blank" rel="noreferrer">
+                            {h.name ?? `${hash.slice(0, 16)}…`}
+                          </a>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+          {vtInd?.executionParents?.length > 0 && (
+            <div style={{ width: "100%" }}>
+              <div className="argus-cell-label" style={{ marginBottom: "0.4rem" }}>Execution parents (VT)</div>
+              <table className="argus-hash-table">
+                <thead>
+                  <tr>
+                    <th>Scanned</th>
+                    <th>Detections</th>
+                    <th>File type</th>
+                    <th>Name</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {vtInd.executionParents.map(p => {
+                    const detColor = p.detections > 0 ? "#e05c5c" : p.detections === 0 ? "#4caf50" : "inherit";
+                    return (
+                      <tr key={p.hash}>
+                        <td>{p.lastAnalysis ?? "—"}</td>
+                        <td style={{ color: detColor }}>{p.totalEngines ? `${p.detections} / ${p.totalEngines}` : "—"}</td>
+                        <td>{p.fileType ?? "—"}</td>
+                        <td>
+                          <a className="argus-hash-link" href={`https://www.virustotal.com/gui/file/${p.hash}`} target="_blank" rel="noreferrer">
+                            {p.name}
+                          </a>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+          {ipList.length > 0 && (
+            <div>
+              <div className="argus-cell-label" style={{ marginBottom: "0.4rem" }}>Related IPs</div>
+              <div className="argus-ips">
+                {ipList.map(ip => {
+                  const rep = ipRep[ip];
+                  return (
+                    <div key={ip} className="ip-tooltip-wrapper">
+                      <span className="argus-hash ip-chip" data-risk={getRiskLevel(rep)}>{ip}</span>
+                      {rep && (
+                        <div className="ip-tooltip">
+                          {rep.country && (
+                            <div className="ipt-row">{countryFlag(rep.countryCode)} {rep.country}</div>
+                          )}
+                          {rep.abuseScore != null && (
+                            <div className="ipt-row">
+                              Abuse: <span style={{ color: abuseColor(rep.abuseScore) }}>{rep.abuseScore}%</span>
+                              {rep.totalReports > 0 && ` (${rep.totalReports} reports)`}
+                            </div>
+                          )}
+                          {rep.isp && <div className="ipt-row ipt-muted">{rep.isp}</div>}
+                          {rep.usageType && <div className="ipt-row ipt-muted">{rep.usageType}</div>}
+                          <div className="ipt-tags">
+                            {rep.isTor     && <span className="ipt-tag tor">TOR</span>}
+                            {rep.isProxy   && <span className="ipt-tag proxy">PROXY</span>}
+                            {rep.isHosting && <span className="ipt-tag hosting">HOSTING</span>}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
-          {(() => {
-            const ips = [...new Set([...(vtInd?.relatedIps || []), ...(campaign.relatedIps || [])])].slice(0, 8);
-            return ips.length > 0 ? (
-              <div>
-                <div className="argus-cell-label" style={{ marginBottom: "0.4rem" }}>Related IPs</div>
-                <div className="argus-ips">
-                  {ips.map(ip => <span key={ip} className="argus-hash">{ip}</span>)}
-                </div>
-              </div>
-            ) : null;
-          })()}
         </div>
       </>
     ) : <p className="status-text">Loading cross-customer data...</p>;
@@ -712,9 +851,9 @@ function IncidentDashboard({ incident, sectionChecks, onToggleSection, onNavigat
     { label: "Severity",            value: incident.severity },
     { label: "Device name",         value: incident.deviceName },
     { label: "User",                value: incident.user },
-    { label: "File name",           value: incident.fileName },
-    { label: "Path",                value: <SuspiciousPath path={incident.filePath} /> },
-    { label: "Command line",        value: <span style={{ fontFamily: "monospace", fontSize: "0.82rem" }}>{incident.commandLine || "—"}</span> },
+    { label: "File name",           value: <span style={{ fontFamily: "monospace", fontSize: "0.82rem" }}>{incident.fileName || "—"}</span> },
+    { label: "Path",                value: <span style={{ fontFamily: "monospace", fontSize: "0.82rem" }}>{incident.filePath || "—"}</span> },
+    { label: "Command line",        value: <span style={{ fontFamily: "monospace", fontSize: "0.82rem", textAlign: "left" }}>{incident.commandLine || "—"}</span> },
     { label: "File hash",           value: <span style={{ fontFamily: "monospace", fontSize: "0.75rem", wordBreak: "break-all" }}>{incident.fileHash}</span> },
     { label: "Microsoft signature", value: incident.microsoftSignature },
     { label: "Quarantine status",   value: incident.quarantineStatus },
@@ -846,7 +985,7 @@ function IncidentDashboard({ incident, sectionChecks, onToggleSection, onNavigat
             const ips = [...new Set([...(vtInd?.relatedIps || []), ...(campaign.relatedIps || [])])].slice(0, 8);
             if (ips.length > 0) lines.push(`Related IPs          : ${ips.join(", ")}`);
             if (vtInd?.relatedHashes?.length > 0)
-              lines.push(`Related hashes       : ${vtInd.relatedHashes.slice(0, 6).join(", ")}`);
+              lines.push(`Related hashes       : ${vtInd.relatedHashes.slice(0, 6).map(h => h.hash ?? h).join(", ")}`);
           }
           break;
 
@@ -1033,6 +1172,8 @@ function App() {
   }
 
   const data = incidents.find(inc => inc.id === selectedId);
+
+  if (!data) return null;
 
   function handleNavigateToIncident(fetchedIncident) {
     setIncidents(prev =>
