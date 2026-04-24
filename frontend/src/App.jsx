@@ -29,7 +29,7 @@ function DetectionDonut({ detectionRatio }) {
   const color = fraction > 0.5 ? "#e05252" : fraction > 0.1 ? "#e8845c" : "#52c07a";
   return (
     <div className="detection-donut">
-      <svg width="90" height="90" viewBox="0 0 100 100">
+      <svg width="120" height="120" viewBox="0 0 100 100">
         <circle cx="50" cy="50" r={r} fill="none" stroke="var(--color-border)" strokeWidth="10" />
         <circle cx="50" cy="50" r={r} fill="none" stroke={color} strokeWidth="10"
           strokeDasharray={`${dashLength} ${gapLength}`} strokeLinecap="round"
@@ -45,6 +45,82 @@ function DetectionDonut({ detectionRatio }) {
   );
 }
 
+const EXT_DESCRIPTIONS = {
+  exe:  "Windows Executable",
+  dll:  "Dynamic Link Library",
+  ps1:  "PowerShell Script",
+  psm1: "PowerShell Module",
+  bat:  "Windows Batch File",
+  cmd:  "Windows Command Script",
+  vbs:  "VBScript",
+  js:   "JavaScript",
+  wsf:  "Windows Script File",
+  hta:  "HTML Application",
+  msi:  "Windows Installer Package",
+  msp:  "Windows Installer Patch",
+  com:  "DOS/Windows Executable",
+  scr:  "Windows Screensaver / Executable",
+  pif:  "Program Information File",
+  lnk:  "Windows Shortcut",
+  iso:  "Disk Image",
+  cab:  "Windows Cabinet Archive",
+  jar:  "Java Archive",
+  crx:  "Chrome Extension",
+  zip:  "ZIP Archive",
+  rar:  "RAR Archive",
+  "7z": "7-Zip Archive",
+  pdf:  "PDF Document",
+  doc:  "Word Document",
+  docx: "Word Document",
+  xls:  "Excel Spreadsheet",
+  xlsx: "Excel Spreadsheet",
+  reg:  "Windows Registry File",
+  sys:  "Windows System Driver",
+  drv:  "Windows Device Driver",
+  inf:  "Setup Information File",
+  cpl:  "Windows Control Panel Item",
+  docm: "Word Macro-Enabled Document",
+  xlsm: "Excel Macro-Enabled Spreadsheet",
+  pptm: "PowerPoint Macro-Enabled Presentation",
+  vbe:  "VBScript Encoded Script",
+  jse:  "JavaScript Encoded Script",
+  cer:  "Security Certificate",
+  pfx:  "Personal Information Exchange (Certificate)",
+  crt:  "Certificate File",
+  der:  "DER Encoded Certificate",
+  p7b:  "PKCS#7 Certificate",
+  ocx:  "ActiveX Control",
+  html: "HTML Document",
+  htm:  "HTML Document",
+  json: "JSON Data File",
+  xml:  "XML Document",
+  yaml: "YAML Configuration File",
+  yml:  "YAML Configuration File",
+  ini:  "Configuration Settings",
+  cfg:  "Configuration File",
+  sh:   "Shell Script",
+  py:   "Python Script",
+  pl:   "Perl Script",
+  rb:   "Ruby Script",
+  tar:  "Tarball Archive",
+  gz:   "Gzip Compressed Archive",
+  img:  "Disk Image File",
+  vhd:  "Virtual Hard Disk",
+  vhdx: "Virtual Hard Disk (Extended)"
+};
+
+function FileExtHint({ fileName }) {
+  if (!fileName || fileName === "N/A") return <span>{fileName || "—"}</span>;
+  const ext = fileName.split(".").pop().toLowerCase();
+  const desc = EXT_DESCRIPTIONS[ext];
+  return (
+    <span className="filename-with-hint">
+      <span className="filename-text">{fileName}</span>
+      {desc && <span className="filename-ext-hint" title={desc}>.{ext} — {desc}</span>}
+    </span>
+  );
+}
+
 function SeverityBadge({ severity }) {
   const lvl = (severity || "").toLowerCase();
   return <span className={`severity-badge severity-badge--${lvl}`}>{severity}</span>;
@@ -55,18 +131,34 @@ function RiskBadge({ level }) {
   return <span className={`risk-badge risk-badge--${lvl}`}>{level}</span>;
 }
 
-function QuarantineStatus({ status }) {
-  if (!status) return null;
-  const lower = status.toLowerCase();
-  let variant = "pending";
-  let icon = "⏳";
-  if (lower.includes("successful") || lower.includes("blocked")) { variant = "ok"; icon = "✓"; }
-  else if (lower.startsWith("failed") || lower.includes("failed")) { variant = "fail"; icon = "✕"; }
+function QuarantineBadge({ status }) {
+  const lower = (status || "").toLowerCase();
+  let lvl;
+  if (["quarantined", "blocked", "prevented"].includes(lower)) lvl = "ok";
+  else if (lower === "detected") lvl = "detected";
+  else if (["notremediated", "failed"].includes(lower)) lvl = "fail";
+  else lvl = "unknown";
+  return <span className={`quarantine-badge quarantine-badge--${lvl}`}>{status}</span>;
+}
+
+function QuarantineStatus({ status, hasFile }) {
+  const lower = (status || "").toLowerCase();
+  let variant, icon, label;
+  if (!status || lower === "none" || lower === "notavailable") {
+    if (!hasFile) return null;
+    variant = "fail"; icon = "✕"; label = "Not contained";
+  } else if (lower.includes("successful") || lower.includes("blocked") || lower === "quarantined") {
+    variant = "ok"; icon = "✓"; label = status;
+  } else if (lower.startsWith("failed") || lower.includes("failed")) {
+    variant = "fail"; icon = "✕"; label = status;
+  } else {
+    variant = "pending"; icon = "⏳"; label = status;
+  }
   return (
     <div className={`quarantine-status quarantine-status--${variant}`}>
       <span className="quarantine-heading">Quarantine</span>
       <span className="quarantine-icon">{icon}</span>
-      <span className="quarantine-label">{status}</span>
+      <span className="quarantine-label">{label}</span>
     </div>
   );
 }
@@ -81,6 +173,17 @@ const SUSPICIOUS_PATH_RULES = [
   { test: (seg) => /recycle/i.test(seg),                 reason: "Recycle Bin: executing from here is a strong indicator of malicious activity" },
   { test: (seg) => /programdata/i.test(seg),             reason: "ProgramData: abused by malware for persistence, often less monitored than Program Files" },
 ];
+
+function getPathWarnings(path) {
+  if (!path) return [];
+  const parts = path.split(/[\\\/]/);
+  const reasons = [];
+  parts.forEach((part, i) =>
+    SUSPICIOUS_PATH_RULES.filter(r => r.test(part, i))
+      .forEach(r => { if (!reasons.includes(r.reason)) reasons.push(r.reason); })
+  );
+  return reasons;
+}
 
 function SuspiciousPath({ path }) {
   if (!path) return <span style={{ color: "var(--color-label)" }}>—</span>;
@@ -187,7 +290,7 @@ function SightingsTimeline({ firstSeen, lastSeen, firstGlobal, detected, effecti
   );
 }
 
-function Widget({ title, children, className = "", checked, onToggle, dragHandlers, isDragOver }) {
+function Widget({ title, children, className = "", dragHandlers, isDragOver }) {
   return (
     <div
       className={`widget ${className}${isDragOver ? " widget--drag-over" : ""}`}
@@ -204,12 +307,6 @@ function Widget({ title, children, className = "", checked, onToggle, dragHandle
           {dragHandlers && <span className="widget-drag-handle">⠿</span>}
           <span className="widget-title">{title}</span>
         </div>
-        {onToggle && (
-          <button
-            className={`widget-report-btn ${checked ? "included" : ""}`}
-            onClick={e => { e.stopPropagation(); onToggle(); }}
-          >{checked ? "✓ In report" : "+ Include in report"}</button>
-        )}
       </div>
       <div className="widget-body">{children}</div>
     </div>
@@ -225,27 +322,89 @@ function StatRow({ label, value }) {
   );
 }
 
+function InfoTip({ text }) {
+  return (
+    <span className="infotip">
+      <span className="infotip-icon">ⓘ</span>
+      <span className="infotip-popup">{text}</span>
+    </span>
+  );
+}
+
+// --- IP reputation helpers (module-scope so IpTooltipChip can use them) ---
+function abuseColor(score) {
+  if (score >= 75) return "#ff4444";
+  if (score >= 25) return "#ffaa00";
+  return "#aaa";
+}
+function getRiskLevel(rep) {
+  if (!rep) return null;
+  if (rep.abuseScore >= 75 || rep.isTor) return "high";
+  if (rep.abuseScore >= 25 || rep.isProxy) return "medium";
+  return "low";
+}
+function countryFlag() { return ""; }
+
+function IpTooltipChip({ ip, rep }) {
+  const wrapperRef = useRef(null);
+  const [tipPos, setTipPos] = useState(null);
+
+  function handleMouseEnter() {
+    if (!rep || !wrapperRef.current) return;
+    const rect = wrapperRef.current.getBoundingClientRect();
+    const tipWidth = 210;
+    const left = Math.max(8, Math.min(rect.left, window.innerWidth - tipWidth - 8));
+    setTipPos({ bottom: window.innerHeight - rect.top + 6, left });
+  }
+
+  return (
+    <div ref={wrapperRef} className="ip-tooltip-wrapper"
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={() => setTipPos(null)}>
+      <span className="argus-hash ip-chip" data-risk={getRiskLevel(rep)}>{ip}</span>
+      {tipPos && rep && (
+        <div className="ip-tooltip ip-tooltip--fixed" style={{ bottom: tipPos.bottom, left: tipPos.left }}>
+          {rep.country && <div className="ipt-row">{countryFlag(rep.countryCode)} {rep.country}</div>}
+          {rep.abuseScore != null && (
+            <div className="ipt-row">
+              Abuse: <span style={{ color: abuseColor(rep.abuseScore) }}>{rep.abuseScore}%</span>
+              {rep.totalReports > 0 && ` (${rep.totalReports} reports)`}
+            </div>
+          )}
+          {rep.isp && <div className="ipt-row ipt-muted">{rep.isp}</div>}
+          {rep.usageType && <div className="ipt-row ipt-muted">{rep.usageType}</div>}
+          <div className="ipt-tags">
+            {rep.isTor     && <span className="ipt-tag tor">TOR</span>}
+            {rep.isProxy   && <span className="ipt-tag proxy">PROXY</span>}
+            {rep.isHosting && <span className="ipt-tag hosting">HOSTING</span>}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function BoolValue({ value, positive = false }) {
   const bad = positive ? !value : value;
   return <span className={bad ? "bool-yes" : "bool-no"}>{value ? "Yes" : "No"}</span>;
 }
 
 // --- KQL Queries widget content ---
-function KQLQueriesContent({ deviceName }) {
+function KQLQueriesContent({ alertId }) {
   const { data: presets = [], isLoading, error } = useQuery({
-    queryKey: ["kql-queries", deviceName],
+    queryKey: ["kql-queries", alertId],
     queryFn: async () => {
-      const res = await fetch(`${API}/api/kql-queries/device/${encodeURIComponent(deviceName)}`);
+      const res = await fetch(`${API}/api/kql-queries/alert/${encodeURIComponent(alertId)}`);
       if (!res.ok) throw new Error("No KQL queries found");
       return res.json();
     },
-    enabled: !!deviceName,
+    enabled: !!alertId,
   });
   const [selectedPreset, setSelectedPreset] = useState(null);
   const [query, setQuery] = useState("");
   const [result, setResult] = useState(null);
 
-  if (!deviceName) return <p className="status-text">No device name available.</p>;
+  if (!alertId) return <p className="status-text">No alert ID available.</p>;
   if (isLoading) return <p className="status-text">Loading KQL queries...</p>;
   if (error) return <p className="status-text">{error.message}</p>;
 
@@ -299,64 +458,15 @@ function KQLQueriesContent({ deviceName }) {
   );
 }
 
-// --- Report modal ---
-function ReportModal({ text, onClose }) {
-  const [copied, setCopied] = useState(false);
-  function handleCopy() {
-    navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }
-  return (
-    <div className="report-modal-overlay" onClick={onClose}>
-      <div className="report-modal" onClick={e => e.stopPropagation()}>
-        <div className="report-modal-header">
-          <span className="report-modal-title">Analysis Report</span>
-          <div style={{ display: "flex", gap: "0.5rem" }}>
-            <button className="btn-copy-report" onClick={handleCopy}>
-              {copied ? "✓ Copied" : "Copy text"}
-            </button>
-            <button className="report-modal-close" onClick={onClose}>✕</button>
-          </div>
-        </div>
-        <pre className="report-modal-body">{text}</pre>
-      </div>
-    </div>
-  );
-}
 
 // --- Main dashboard ---
-function IncidentDashboard({ incident, sectionChecks, onToggleSection, onNavigateToIncident }) {
-  const { id: incidentId, fileHash, deviceName, user } = incident;
+function IncidentDashboard({ incident }) {
+  const { fileHash, deviceName, user } = incident;
 
-  const [daysFilter, setDaysFilter] = useState(null);
   const [weeksFilter, setWeeksFilter] = useState(2);
+  const [weeksInput, setWeeksInput] = useState("2");
 
-  const [eventIdInput, setEventIdInput] = useState("");
-  const [eventIdStatus, setEventIdStatus] = useState(null); // null | "loading" | "not-found"
-
-  async function handleEventIdKeyDown(e) {
-    if (e.key !== "Enter" || !eventIdInput.trim()) return;
-    setEventIdStatus("loading");
-    try {
-      const res = await fetch(`${API}/api/incidents/${eventIdInput.trim()}`);
-      if (res.ok) {
-        const fetched = await res.json();
-        onNavigateToIncident?.(fetched);
-        setEventIdInput("");
-        setEventIdStatus(null);
-      } else {
-        setEventIdStatus("not-found");
-      }
-    } catch {
-      setEventIdStatus("not-found");
-    }
-  }
-  // Effective window in days — days input overrides weeks when set; fall back to 14 if both empty
-  const effectiveDays = daysFilter != null ? daysFilter : (weeksFilter != null ? weeksFilter * 7 : 14);
-
-  const [reportOpen, setReportOpen] = useState(false);
-  const [reportText, setReportText] = useState("");
+const effectiveDays = (weeksFilter ?? 2) * 7;
 
   const [widgetOrder, setWidgetOrder] = useState(() => {
     try {
@@ -369,13 +479,6 @@ function IncidentDashboard({ incident, sectionChecks, onToggleSection, onNavigat
 
   const dragItemIdx = useRef(null);
   const [dropTargetIdx, setDropTargetIdx] = useState(null);
-
-  function wc(key) {
-    return {
-      checked: !!sectionChecks?.[`${incidentId}:${key}`],
-      onToggle: () => onToggleSection?.(incidentId, key),
-    };
-  }
 
   function makeDragHandlers(idx) {
     return {
@@ -437,15 +540,6 @@ function IncidentDashboard({ incident, sectionChecks, onToggleSection, onNavigat
     enabled: !!user,
   });
 
-  const { data: campaigns = [] } = useQuery({
-    queryKey: ["campaign"],
-    queryFn: async () => {
-      const res = await fetch(`${API}/api/campaign-context`);
-      if (!res.ok) return [];
-      return res.json();
-    },
-  });
-
   const { data: vtInd } = useQuery({
     queryKey: ["vt-indicators", fileHash],
     queryFn: async () => {
@@ -456,27 +550,31 @@ function IncidentDashboard({ incident, sectionChecks, onToggleSection, onNavigat
     enabled: !!fileHash,
   });
 
-  const campaign = campaigns[0];
-  const ipList = [...new Set([
-    ...(vtInd?.relatedIps || []),
-    ...(campaign?.relatedIps || []),
-  ])].slice(0, 8);
+  const ipList = [...new Set(vtInd?.relatedIps || [])].slice(0, 8);
+
+  const deviceIpList = [...new Set([
+    dc?.lastIpAddress,
+    dc?.lastExternalIpAddress,
+    incident.sourceIp,
+  ].filter(Boolean))];
+
+  const allIps = [...new Set([...ipList, ...deviceIpList])];
 
   const { data: ipRepData } = useQuery({
-    queryKey: ["ip-reputation", ipList.join(",")],
+    queryKey: ["ip-reputation", allIps.join(",")],
     queryFn: async () => {
-      if (!ipList.length) return { results: {} };
+      if (!allIps.length) return { results: {} };
       const resp = await fetch(
-        `${API}/api/ip-reputation?ips=${encodeURIComponent(ipList.join(","))}`
+        `${API}/api/ip-reputation?ips=${encodeURIComponent(allIps.join(","))}`
       );
       return resp.json();
     },
-    enabled: ipList.length > 0,
+    enabled: allIps.length > 0,
     staleTime: 1000 * 60 * 30,
   });
   const ipRep = ipRepData?.results ?? {};
 
-  const threatFamily = fi?.microsoftReputation?.threatFamily || incident.microsoftSignature;
+  const threatFamily = fi?.mdeFileInfo?.determinationValue || incident.microsoftSignature;
   const threatType = getThreatType(threatFamily);
 
   const vtHints = [
@@ -496,32 +594,31 @@ function IncidentDashboard({ incident, sectionChecks, onToggleSection, onNavigat
     enabled: !!threatFamily && threatFamily !== "N/A",
     staleTime: Infinity,
   });
-  const threatDesc = descData?.description ?? null;
-
-  // --- IP reputation helpers ---
-  function abuseColor(score) {
-    if (score >= 75) return "#ff4444";
-    if (score >= 25) return "#ffaa00";
-    return "#aaa";
-  }
-  function getRiskLevel(rep) {
-    if (!rep) return null;
-    if (rep.abuseScore >= 75 || rep.isTor) return "high";
-    if (rep.abuseScore >= 25 || rep.isProxy) return "medium";
-    return "low";
-  }
-  function countryFlag(code) {
-    if (!code || code.length !== 2) return "";
-    return String.fromCodePoint(
-      ...code.toUpperCase().split("").map(c => 0x1F1E0 - 65 + c.charCodeAt(0))
-    );
-  }
+  const { threatDesc, mitreUrl } = (() => {
+    const raw = descData?.description;
+    if (!raw) return { threatDesc: null, mitreUrl: null };
+    // Extract the first markdown link URL from the description
+    const linkMatch = raw.match(/\[([^\]]+)\]\((https:\/\/attack\.mitre\.org[^)]+)\)/);
+    const url = linkMatch ? linkMatch[2] : null;
+    // Strip markdown links and citations, leaving plain text
+    const cleaned = raw
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+      .replace(/\s*\(Citation:[^)]*\)/g, "")
+      .trim();
+    return { threatDesc: cleaned, mitreUrl: url };
+  })();
 
   // --- Widget content renderers ---
   function renderVT() {
     return fiLoading ? <p className="status-text">Loading...</p> : fi ? (
       <>
         <DetectionDonut detectionRatio={fi.virusTotal.detectionRatio} />
+        {fi.virusTotal.popularThreatLabels?.length > 0 && (
+          <div className="vt-common-classification">
+            <span className="vt-classification-label">Common classification</span>
+            <span className="vt-classification-value">{fi.virusTotal.popularThreatLabels[0]}</span>
+          </div>
+        )}
         <a className="vt-link" href={`https://www.virustotal.com/gui/file/${fileHash}`} target="_blank" rel="noreferrer">
           ↗ View on VirusTotal
         </a>
@@ -529,7 +626,6 @@ function IncidentDashboard({ incident, sectionChecks, onToggleSection, onNavigat
           <StatRow label="First submission" value={fi.virusTotal.firstSubmission || "N/A"} />
           <StatRow label="Last analysis" value={fi.virusTotal.lastAnalysis || "N/A"} />
           <StatRow label="File type" value={fi.virusTotal.fileType || "N/A"} />
-          <StatRow label="Reputation" value={fi.virusTotal.reputationScore || "N/A"} />
         </div>
         {fi.virusTotal.tags?.length > 0 && (
           <div className="vt-tags" style={{ marginTop: "0.75rem" }}>
@@ -550,26 +646,34 @@ function IncidentDashboard({ incident, sectionChecks, onToggleSection, onNavigat
   function renderVerdict() {
     return (
       <div style={{ display: "flex", gap: "1.25rem", alignItems: "flex-start", flexWrap: "wrap" }}>
-        <QuarantineStatus status={incident.quarantineStatus} />
+        <QuarantineStatus status={incident.quarantineStatus} hasFile={!!incident.fileHash} />
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", marginBottom: "0.6rem", flexWrap: "wrap" }}>
-            {threatType && <div className="threat-type-chip">{threatType}</div>}
-            <SeverityBadge severity={incident.severity} />
-          </div>
           {fi?.virusTotal.meaningfulName
             ? <div className="threat-meaningful-name">{fi.virusTotal.meaningfulName}</div>
             : <div className="threat-meaningful-name" style={{ fontSize: "0.82rem" }}>{incident.microsoftSignature}</div>
           }
           {threatDesc && <p className="threat-description">{threatDesc}</p>}
-          {fi?.virusTotal.popularThreatLabels?.length > 0 && (
-            <div className="vt-tags" style={{ marginBottom: "0.75rem" }}>
-              {fi.virusTotal.popularThreatLabels.map(l => <span key={l} className="vt-tag">{l}</span>)}
-            </div>
+          {mitreUrl && (
+            <a className="vt-link" href={mitreUrl} target="_blank" rel="noreferrer">
+              ↗ View on MITRE ATT&CK
+            </a>
           )}
-          <StatRow label="Status" value={incident.status} />
-          <StatRow label="Log source" value={incident.logSource} />
-          <StatRow label="Detected" value={incident.detectionTimestamp} />
-          <StatRow label="ID" value={incident.id} />
+          <div style={{ marginTop: "1rem" }}>
+            <StatRow label="Status" value={incident.status} />
+            <StatRow label="Log source" value={incident.logSource} />
+            <StatRow label="Detected" value={incident.detectionTimestamp} />
+            <StatRow label="ID" value={incident.id} />
+            <StatRow label="Category" value={incident.category} />
+            <StatRow label="Detection source" value={incident.detectionSource} />
+            {incident.classification && <StatRow label="Classification" value={incident.classification} />}
+            {incident.determination && <StatRow label="Determination" value={incident.determination} />}
+            {incident.assignedTo && <StatRow label="Assigned to" value={incident.assignedTo} />}
+            {fi?.virusTotal.popularThreatLabels?.length > 0 && (
+              <div className="vt-tags" style={{ marginTop: "0.75rem" }}>
+                {fi.virusTotal.popularThreatLabels.map(l => <span key={l} className="vt-tag">{l}</span>)}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     );
@@ -578,7 +682,7 @@ function IncidentDashboard({ incident, sectionChecks, onToggleSection, onNavigat
   function renderFile() {
     return (
       <>
-        <StatRow label="File name" value={incident.fileName} />
+        <StatRow label="File name" value={<FileExtHint fileName={incident.fileName} />} />
         <div className="stat-row" style={{ flexDirection: "column", alignItems: "flex-start", gap: "0.3rem" }}>
           <span className="stat-label">File path</span>
           <SuspiciousPath path={incident.filePath} />
@@ -587,18 +691,21 @@ function IncidentDashboard({ incident, sectionChecks, onToggleSection, onNavigat
           <span className="stat-label">Command line</span>
           <span className="stat-value" style={{ fontFamily: "monospace", fontSize: "0.78rem", textAlign: "left" }}>{incident.commandLine || "—"}</span>
         </div>
+        {incident.parentProcessName && (
+          <StatRow label="Parent process" value={incident.parentProcessName} />
+        )}
+        {incident.evidenceUrl && (
+          <StatRow label="URL" value={incident.evidenceUrl} />
+        )}
+        {incident.registryKey && (
+          <StatRow label="Registry key" value={<span style={{fontFamily:"monospace",fontSize:"0.75rem"}}>{incident.registryKey}</span>} />
+        )}
         <div className="stat-row" style={{ flexDirection: "column", alignItems: "flex-start", gap: "0.3rem" }}>
           <span className="stat-label">File hash (SHA-256)</span>
           <span className="stat-value" style={{ fontFamily: "monospace", fontSize: "0.7rem", wordBreak: "break-all" }}>{incident.fileHash}</span>
         </div>
         <StatRow label="MS signature" value={incident.microsoftSignature} />
-        {fi && (
-          <>
-            <StatRow label="First seen internally" value={fi.internalSightings.firstSeenInternally} />
-            <StatRow label="Last seen internally" value={fi.internalSightings.lastSeenInternally} />
-          </>
-        )}
-        <StatRow label="Source IP" value={incident.sourceIp} />
+        {incident.sourceIp && <StatRow label="Source IP" value={<IpTooltipChip ip={incident.sourceIp} rep={ipRep[incident.sourceIp]} />} />}
         <StatRow label="Destination IP" value={incident.destinationIp} />
       </>
     );
@@ -607,30 +714,73 @@ function IncidentDashboard({ incident, sectionChecks, onToggleSection, onNavigat
   function renderObs() {
     return fi ? (
       <>
+        {fi?.mdeFileInfo && (
+          <>
+            {fi.mdeFileInfo.determinationType && <StatRow label="Determination" value={fi.mdeFileInfo.determinationType} />}
+            {fi.mdeFileInfo.determinationValue && <StatRow label="Threat family" value={fi.mdeFileInfo.determinationValue} />}
+            {fi.mdeFileInfo.filePublisher && <StatRow label="Publisher" value={fi.mdeFileInfo.filePublisher} />}
+            {fi.mdeFileInfo.signer && <StatRow label="Signer" value={fi.mdeFileInfo.signer} />}
+            {fi.mdeFileInfo.isValidCertificate !== null && (
+              <div className="stat-row"><span className="stat-label">Valid certificate</span><BoolValue value={fi.mdeFileInfo.isValidCertificate} positive /></div>
+            )}
+          </>
+        )}
         <div className="observations-counts">
           <div className="obs-count-item">
-            <span className="obs-count-number">{fi.internalSightings.totalInternalDetections}</span>
-            <span className="obs-count-label">Internal detections</span>
+            <span className="obs-count-number">{fi.mdeFileInfo?.orgPrevalence ?? "—"}</span>
+            <span className="obs-count-label">Devices in org</span>
           </div>
           <div className="obs-count-item">
-            <span className="obs-count-number">{fi.internalSightings.numberOfAffectedDevices}</span>
-            <span className="obs-count-label">Affected devices</span>
-          </div>
-          <div className="obs-count-item">
-            <span className="obs-count-number">{fi.crossCustomerObservations.numberOfCustomerEnvironments}</span>
-            <span className="obs-count-label">Customer envs</span>
+            <span className="obs-count-number">{fi.mdeFileInfo?.globalPrevalence ?? "—"}</span>
+            <span className="obs-count-label">Devices worldwide</span>
           </div>
         </div>
         <StatRow label="Seen before" value={fi.internalSightings.seenBefore} />
-        <StatRow label="Spike detected (24h)" value={fi.crossCustomerObservations.spikeDetectedInLast24Hours} />
-        <StatRow label="Campaign likelihood" value={fi.crossCustomerObservations.campaignLikelihood} />
-        <SightingsTimeline
-          firstSeen={fi.internalSightings.firstSeenInternally}
-          lastSeen={fi.internalSightings.lastSeenInternally}
-          firstGlobal={fi.crossCustomerObservations.firstObservedAcrossCustomers}
-          detected={incident.detectionTimestamp}
-          effectiveDays={effectiveDays}
-        />
+        <StatRow label="First seen internally" value={fi.internalSightings.firstSeenInternally} />
+        <StatRow label="Last seen internally" value={fi.internalSightings.lastSeenInternally} />
+        <div className="stat-row">
+          <span className="stat-label">Spike detected (24h) <InfoTip text="A spike is detected when the number of internal detections in the last 24 hours exceeds the baseline average for this alert type" /></span>
+          <span className="stat-value">{fi.crossCustomerObservations.spikeDetectedInLast24Hours}</span>
+        </div>
+        <div className="stat-row">
+          <span className="stat-label">Campaign likelihood <InfoTip text="Campaign likelihood is assessed based on cross-tenant prevalence, file hash overlap, and shared infrastructure indicators" /></span>
+          <span className="stat-value">{fi.crossCustomerObservations.campaignLikelihood}</span>
+        </div>
+        <div className="obs-timeline-track">
+          <SightingsTimeline
+            firstSeen={fi.internalSightings.firstSeenInternally || fi.mdeFileInfo?.orgFirstSeen}
+            lastSeen={fi.internalSightings.lastSeenInternally || fi.mdeFileInfo?.orgLastSeen}
+            firstGlobal={fi.crossCustomerObservations.firstObservedAcrossCustomers || fi.mdeFileInfo?.globalFirstObserved}
+            detected={incident.detectionTimestamp}
+            effectiveDays={effectiveDays}
+          />
+        </div>
+        <div style={{ display: "flex", justifyContent: "center", marginTop: "1.5rem" }}>
+        <label className="weeks-filter-btn" style={{ width: "fit-content" }}>
+          Last
+          <input
+            className="weeks-num-input"
+            type="number"
+            min={1}
+            max={52}
+            value={weeksInput}
+            placeholder="2"
+            onChange={e => {
+              setWeeksInput(e.target.value);
+              const v = parseInt(e.target.value);
+              if (!isNaN(v) && v >= 1 && v <= 52) setWeeksFilter(v);
+            }}
+            onBlur={e => {
+              const v = parseInt(e.target.value);
+              const clamped = isNaN(v) ? 2 : Math.max(1, Math.min(52, v));
+              setWeeksFilter(clamped);
+              setWeeksInput(String(clamped));
+            }}
+            onClick={e => e.target.select()}
+          />
+          {weeksFilter === 1 ? "week" : "weeks"}
+        </label>
+        </div>
       </>
     ) : <p className="status-text">Loading observations...</p>;
   }
@@ -647,16 +797,34 @@ function IncidentDashboard({ incident, sectionChecks, onToggleSection, onNavigat
         <StatRow label="Exposure" value={dc.exposureLevel} />
         <StatRow label="Last logged on user" value={dc.lastLoggedOnUser} />
         <StatRow label="Failed logons (24h)" value={String(dc.failedLogonsLast24h)} />
-        <StatRow label="Suspicious processes (24h)" value={String(dc.suspiciousProcessesLast24h)} />
         <div className="stat-row">
-          <span className="stat-label">Beaconing detected</span>
+          <span className="stat-label">Suspicious processes (24h) <InfoTip text="Count of processes flagged as anomalous by Defender based on behavior heuristics in the last 24 hours" /></span>
+          <span className="stat-value">{String(dc.suspiciousProcessesLast24h)}</span>
+        </div>
+        <div className="stat-row">
+          <span className="stat-label">Beaconing detected <InfoTip text="Indicates whether the device has shown periodic outbound connection patterns consistent with C2 communication" /></span>
           <BoolValue value={dc.beaconingDetected} />
         </div>
         <div className="stat-row">
-          <span className="stat-label">Credential dumping</span>
+          <span className="stat-label">Credential dumping <InfoTip text="Indicates whether Defender has detected process activity consistent with credential extraction from memory" /></span>
           <BoolValue value={dc.credentialDumpingDetected} />
         </div>
         <StatRow label="Last seen" value={dc.lastSeen} />
+        {dc.healthStatus && <StatRow label="Health status" value={dc.healthStatus} />}
+        {dc.lastIpAddress && (
+          <StatRow label="Last IP (internal)" value={<IpTooltipChip ip={dc.lastIpAddress} rep={ipRep[dc.lastIpAddress]} />} />
+        )}
+        {dc.lastExternalIpAddress && (
+          <StatRow label="Last IP (external)" value={<IpTooltipChip ip={dc.lastExternalIpAddress} rep={ipRep[dc.lastExternalIpAddress]} />} />
+        )}
+        {dc.rbacGroupName && <StatRow label="Device group" value={dc.rbacGroupName} />}
+{dc.firstSeen && <StatRow label="First seen" value={dc.firstSeen} />}
+        {dc.machineTags?.length > 0 && (
+          <div className="stat-row" style={{flexDirection:"column",alignItems:"flex-start",gap:"0.35rem"}}>
+            <span className="stat-label">Tags</span>
+            <div className="vt-tags">{dc.machineTags.map(t => <span key={t} className="vt-tag">{t}</span>)}</div>
+          </div>
+        )}
       </>
     ) : <p className="status-text">No device context found</p>;
   }
@@ -697,306 +865,92 @@ function IncidentDashboard({ incident, sectionChecks, onToggleSection, onNavigat
   }
 
   function renderArgus() {
-    return campaign ? (
+    const hasData = vtInd && (vtInd.relatedHashes?.length > 0 || vtInd.executionParents?.length > 0 || ipList.length > 0);
+    if (!hasData) return <p className="status-text">No external intelligence available for this file.</p>;
+    return (
       <>
-        <div className="argus-grid">
-          <div className="argus-cell">
-            <span className="argus-cell-label">Customer environments</span>
-            <span className="argus-cell-value">{campaign.numberOfCustomerEnvironments}</span>
-            <span className="argus-cell-sub">globally affected</span>
-          </div>
-          <div className="argus-cell">
-            <span className="argus-cell-label">Campaign likelihood</span>
-            <span className="argus-cell-value">{campaign.campaignLikelihood}</span>
-            <span className="argus-cell-sub">{campaign.spikeDetectedLast24h ? "⚠ Spike in last 24h" : "No spike detected"}</span>
-          </div>
-          <div className="argus-cell">
-            <span className="argus-cell-label">Affected devices</span>
-            <span className="argus-cell-value">{campaign.numberOfAffectedDevices}</span>
-            <span className="argus-cell-sub">{campaign.numberOfAffectedUsers} users</span>
-          </div>
-          <div className="argus-cell">
-            <span className="argus-cell-label">First observed</span>
-            <span className="argus-cell-value" style={{ fontSize: "1rem" }}>{campaign.firstObserved?.slice(0, 10)}</span>
-            <span className="argus-cell-sub">Last: {campaign.lastObserved?.slice(0, 10)}</span>
-          </div>
-        </div>
-        <div style={{ display: "flex", gap: "2.5rem", flexWrap: "wrap" }}>
-          {vtInd?.relatedHashes?.length > 0 && (
-            <div style={{ width: "100%" }}>
-              <div className="argus-cell-label" style={{ marginBottom: "0.4rem" }}>Related hashes (VT)</div>
-              <table className="argus-hash-table">
-                <thead>
-                  <tr>
-                    <th>Scanned</th>
-                    <th>Detections</th>
-                    <th>File type</th>
-                    <th>Name</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {vtInd.relatedHashes.slice(0, 10).map(h => {
-                    const hash = h.hash ?? h;
-                    const detections = h.detections ?? null;
-                    const total = h.totalEngines ?? null;
-                    const detColor = detections > 0 ? "#e05c5c" : detections === 0 ? "#4caf50" : "inherit";
-                    return (
-                      <tr key={hash}>
-                        <td>{h.lastAnalysis ?? "—"}</td>
-                        <td style={{ color: detColor }}>
-                          {detections !== null ? `${detections} / ${total}` : "—"}
-                        </td>
-                        <td>{h.fileType ?? "—"}</td>
-                        <td>
-                          <a className="argus-hash-link" href={`https://www.virustotal.com/gui/file/${hash}`} target="_blank" rel="noreferrer">
-                            {h.name ?? `${hash.slice(0, 16)}…`}
-                          </a>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-          {vtInd?.executionParents?.length > 0 && (
-            <div style={{ width: "100%" }}>
-              <div className="argus-cell-label" style={{ marginBottom: "0.4rem" }}>Execution parents (VT)</div>
-              <table className="argus-hash-table">
-                <thead>
-                  <tr>
-                    <th>Scanned</th>
-                    <th>Detections</th>
-                    <th>File type</th>
-                    <th>Name</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {vtInd.executionParents.map(p => {
-                    const detColor = p.detections > 0 ? "#e05c5c" : p.detections === 0 ? "#4caf50" : "inherit";
-                    return (
-                      <tr key={p.hash}>
-                        <td>{p.lastAnalysis ?? "—"}</td>
-                        <td style={{ color: detColor }}>{p.totalEngines ? `${p.detections} / ${p.totalEngines}` : "—"}</td>
-                        <td>{p.fileType ?? "—"}</td>
-                        <td>
-                          <a className="argus-hash-link" href={`https://www.virustotal.com/gui/file/${p.hash}`} target="_blank" rel="noreferrer">
-                            {p.name}
-                          </a>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-          {ipList.length > 0 && (
-            <div>
-              <div className="argus-cell-label" style={{ marginBottom: "0.4rem" }}>Related IPs</div>
-              <div className="argus-ips">
-                {ipList.map(ip => {
-                  const rep = ipRep[ip];
+        {vtInd.relatedHashes?.length > 0 && (
+          <div style={{ marginBottom: "1.5rem" }}>
+            <div className="argus-cell-label" style={{ marginBottom: "0.4rem" }}>Related hashes (VT)</div>
+            <table className="argus-hash-table">
+              <thead><tr><th>Scanned</th><th>Detections</th><th>File type</th><th>Name</th></tr></thead>
+              <tbody>
+                {vtInd.relatedHashes.map(p => {
+                  const detColor = p.detections > 0 ? "#e05c5c" : p.detections === 0 ? "#4caf50" : "inherit";
                   return (
-                    <div key={ip} className="ip-tooltip-wrapper">
-                      <span className="argus-hash ip-chip" data-risk={getRiskLevel(rep)}>{ip}</span>
-                      {rep && (
-                        <div className="ip-tooltip">
-                          {rep.country && (
-                            <div className="ipt-row">{countryFlag(rep.countryCode)} {rep.country}</div>
-                          )}
-                          {rep.abuseScore != null && (
-                            <div className="ipt-row">
-                              Abuse: <span style={{ color: abuseColor(rep.abuseScore) }}>{rep.abuseScore}%</span>
-                              {rep.totalReports > 0 && ` (${rep.totalReports} reports)`}
-                            </div>
-                          )}
-                          {rep.isp && <div className="ipt-row ipt-muted">{rep.isp}</div>}
-                          {rep.usageType && <div className="ipt-row ipt-muted">{rep.usageType}</div>}
-                          <div className="ipt-tags">
-                            {rep.isTor     && <span className="ipt-tag tor">TOR</span>}
-                            {rep.isProxy   && <span className="ipt-tag proxy">PROXY</span>}
-                            {rep.isHosting && <span className="ipt-tag hosting">HOSTING</span>}
-                          </div>
-                        </div>
-                      )}
-                    </div>
+                    <tr key={p.hash}>
+                      <td>{p.lastAnalysis ?? "—"}</td>
+                      <td style={{ color: detColor }}>{p.totalEngines ? `${p.detections} / ${p.totalEngines}` : "—"}</td>
+                      <td>{p.fileType ?? "—"}</td>
+                      <td><a className="argus-hash-link" href={`https://www.virustotal.com/gui/file/${p.hash}`} target="_blank" rel="noreferrer">{p.name}</a></td>
+                    </tr>
                   );
                 })}
-              </div>
+              </tbody>
+            </table>
+          </div>
+        )}
+        {vtInd.executionParents?.length > 0 && (
+          <div style={{ marginBottom: "1.5rem" }}>
+            <div className="argus-cell-label" style={{ marginBottom: "0.4rem" }}>Execution parents (VT)</div>
+            <table className="argus-hash-table">
+              <thead><tr><th>Scanned</th><th>Detections</th><th>File type</th><th>Name</th></tr></thead>
+              <tbody>
+                {vtInd.executionParents.map(p => {
+                  const detColor = p.detections > 0 ? "#e05c5c" : p.detections === 0 ? "#4caf50" : "inherit";
+                  return (
+                    <tr key={p.hash}>
+                      <td>{p.lastAnalysis ?? "—"}</td>
+                      <td style={{ color: detColor }}>{p.totalEngines ? `${p.detections} / ${p.totalEngines}` : "—"}</td>
+                      <td>{p.fileType ?? "—"}</td>
+                      <td><a className="argus-hash-link" href={`https://www.virustotal.com/gui/file/${p.hash}`} target="_blank" rel="noreferrer">{p.name}</a></td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {ipList.length > 0 && (
+          <div>
+            <div className="argus-cell-label" style={{ marginBottom: "0.4rem" }}>Related IPs</div>
+            <div className="argus-ips">
+              {ipList.map(ip => (
+                <IpTooltipChip key={ip} ip={ip} rep={ipRep[ip]} />
+              ))}
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </>
-    ) : <p className="status-text">Loading cross-customer data...</p>;
+    );
   }
 
   function renderKQL() {
-    return <KQLQueriesContent deviceName={deviceName} />;
+    return <KQLQueriesContent alertId={incident.id} />;
   }
 
   const widgetDefs = {
-    vt:      { title: "VirusTotal Detection",                    full: false, wcKey: "VT Score",         render: renderVT },
-    verdict: { title: "Threat Classification & Verdict",         full: false, wcKey: "Verdict",          render: renderVerdict },
-    file:    { title: "File & Execution",                        full: false, wcKey: "File & Execution", render: renderFile },
-    obs:     { title: "Observations & Timeline",                 full: false, wcKey: "Observations",     render: renderObs },
-    device:  { title: "Device Context",                          full: false, wcKey: "Device",           render: renderDevice },
-    user:    { title: "User Context",                            full: false, wcKey: "User",             render: renderUser },
-    argus:   { title: "Argus / Cross-Customer Intelligence",     full: true,  wcKey: "Argus",            render: renderArgus },
-    kql:     { title: "KQL Threat Hunting",                      full: true,  wcKey: null,               render: renderKQL },
+    vt:      { title: "VirusTotal Detection",        full: false, render: renderVT },
+    verdict: { title: "Threat Classification & Verdict", full: false, render: renderVerdict },
+    file:    { title: "File & Execution",            full: false, render: renderFile },
+    obs:     { title: "Observations & Timeline",     full: false, render: renderObs },
+    device:  { title: "Device Context",              full: false, render: renderDevice },
+    user:    { title: "User Context",                full: false, render: renderUser },
+    argus:   { title: "External Intelligence",       full: true,  render: renderArgus },
+    kql:     { title: "KQL Threat Hunting",          full: true,  render: renderKQL },
   };
 
   const summaryFields = [
-    { label: "Detection timestamp", value: incident.detectionTimestamp },
-    { label: "Severity",            value: incident.severity },
-    { label: "Device name",         value: incident.deviceName },
-    { label: "User",                value: incident.user },
+    { label: "Detection timestamp", value: <span className="timestamp-value">{incident.detectionTimestamp}</span> },
+    { label: "Severity",            value: <SeverityBadge severity={incident.severity} /> },
     { label: "File name",           value: <span style={{ fontFamily: "monospace", fontSize: "0.82rem" }}>{incident.fileName || "—"}</span> },
     { label: "Path",                value: <span style={{ fontFamily: "monospace", fontSize: "0.82rem" }}>{incident.filePath || "—"}</span> },
-    { label: "Command line",        value: <span style={{ fontFamily: "monospace", fontSize: "0.82rem", textAlign: "left" }}>{incident.commandLine || "—"}</span> },
+    { label: "Command line",        value: <span style={{ fontFamily: "monospace", fontSize: "0.82rem" }}>{(incident.commandLine || "—").replace(/^"|"$/g, "")}</span> },
     { label: "File hash",           value: <span style={{ fontFamily: "monospace", fontSize: "0.75rem", wordBreak: "break-all" }}>{incident.fileHash}</span> },
     { label: "Microsoft signature", value: incident.microsoftSignature },
-    { label: "Quarantine status",   value: incident.quarantineStatus },
+    { label: "Quarantine status",   value: incident.quarantineStatus ? <QuarantineBadge status={incident.quarantineStatus} /> : "—" },
   ];
 
-  function buildReportText() {
-    const now = new Date().toISOString().replace("T", " ").slice(0, 19) + " UTC";
-    const lines = [];
-    const sep = "─".repeat(52);
-
-    lines.push("INCIDENT ANALYSIS REPORT");
-    lines.push("=".repeat(52));
-    lines.push(`Incident : ${incident.title}`);
-    lines.push(`ID       : ${incident.id}`);
-    lines.push(`Generated: ${now}`);
-    lines.push("");
-
-    const includedKeys = widgetOrder.filter(key => {
-      const def = widgetDefs[key];
-      return def?.wcKey && sectionChecks?.[`${incidentId}:${def.wcKey}`];
-    });
-
-    if (includedKeys.length === 0) {
-      lines.push("No sections included. Click '+ Include in report' on widgets to add them.");
-      return lines.join("\n");
-    }
-
-    for (const key of includedKeys) {
-      lines.push(sep);
-      lines.push(widgetDefs[key].title.toUpperCase());
-      lines.push(sep);
-
-      switch (key) {
-        case "vt":
-          if (fi) {
-            lines.push(`Detection ratio  : ${fi.virusTotal.detectionRatio}`);
-            lines.push(`File type        : ${fi.virusTotal.fileType || "N/A"}`);
-            lines.push(`First submission : ${fi.virusTotal.firstSubmission || "N/A"}`);
-            lines.push(`Last analysis    : ${fi.virusTotal.lastAnalysis || "N/A"}`);
-            lines.push(`Reputation       : ${fi.virusTotal.reputationScore || "N/A"}`);
-            if (fi.virusTotal.tags?.length > 0)
-              lines.push(`Tags             : ${fi.virusTotal.tags.join(", ")}`);
-          } else {
-            lines.push("No VirusTotal data available.");
-          }
-          break;
-
-        case "verdict":
-          lines.push(`Quarantine status: ${incident.quarantineStatus}`);
-          lines.push(`Threat type      : ${threatType || "Unknown"}`);
-          lines.push(`Severity         : ${incident.severity}`);
-          lines.push(`Signature        : ${fi?.virusTotal.meaningfulName || incident.microsoftSignature}`);
-          lines.push(`Status           : ${incident.status}`);
-          lines.push(`Log source       : ${incident.logSource}`);
-          lines.push(`Detected         : ${incident.detectionTimestamp}`);
-          if (threatDesc) { lines.push(""); lines.push(threatDesc); }
-          if (fi?.virusTotal.popularThreatLabels?.length > 0)
-            lines.push(`Threat labels    : ${fi.virusTotal.popularThreatLabels.join(", ")}`);
-          break;
-
-        case "file":
-          lines.push(`File name        : ${incident.fileName}`);
-          lines.push(`File path        : ${incident.filePath}`);
-          lines.push(`Command line     : ${incident.commandLine || "—"}`);
-          lines.push(`SHA-256          : ${incident.fileHash}`);
-          lines.push(`MS signature     : ${incident.microsoftSignature}`);
-          if (fi) {
-            lines.push(`First seen (int) : ${fi.internalSightings.firstSeenInternally}`);
-            lines.push(`Last seen (int)  : ${fi.internalSightings.lastSeenInternally}`);
-          }
-          lines.push(`Source IP        : ${incident.sourceIp}`);
-          lines.push(`Destination IP   : ${incident.destinationIp}`);
-          break;
-
-        case "obs":
-          if (fi) {
-            lines.push(`Internal detections   : ${fi.internalSightings.totalInternalDetections}`);
-            lines.push(`Affected devices      : ${fi.internalSightings.numberOfAffectedDevices}`);
-            lines.push(`Customer environments : ${fi.crossCustomerObservations.numberOfCustomerEnvironments}`);
-            lines.push(`Seen before           : ${fi.internalSightings.seenBefore}`);
-            lines.push(`Spike detected (24h)  : ${fi.crossCustomerObservations.spikeDetectedInLast24Hours}`);
-            lines.push(`Campaign likelihood   : ${fi.crossCustomerObservations.campaignLikelihood}`);
-            lines.push(`First seen internally : ${fi.internalSightings.firstSeenInternally}`);
-            lines.push(`Last seen internally  : ${fi.internalSightings.lastSeenInternally}`);
-            lines.push(`First seen globally   : ${fi.crossCustomerObservations.firstObservedAcrossCustomers}`);
-          }
-          break;
-
-        case "device":
-          if (dc) {
-            lines.push(`Device               : ${dc.deviceName}`);
-            lines.push(`Risk level           : ${dc.riskLevel}`);
-            lines.push(`Type                 : ${dc.deviceType} · ${dc.osPlatform}`);
-            lines.push(`OS                   : ${dc.osVersion}`);
-            lines.push(`Exposure             : ${dc.exposureLevel}`);
-            lines.push(`Last logged on user  : ${dc.lastLoggedOnUser}`);
-            lines.push(`Failed logons (24h)  : ${dc.failedLogonsLast24h}`);
-            lines.push(`Suspicious processes : ${dc.suspiciousProcessesLast24h}`);
-            lines.push(`Beaconing detected   : ${dc.beaconingDetected ? "Yes" : "No"}`);
-            lines.push(`Credential dumping   : ${dc.credentialDumpingDetected ? "Yes" : "No"}`);
-            lines.push(`Last seen            : ${dc.lastSeen}`);
-          }
-          break;
-
-        case "user":
-          if (uc) {
-            lines.push(`User             : ${uc.displayName} (${uc.userPrincipalName})`);
-            lines.push(`Risk level       : ${uc.riskLevel}`);
-            lines.push(`Sign-in risk     : ${uc.signInRiskLevel}`);
-            lines.push(`Failed logins    : ${uc.failedLoginsLast24h}`);
-            lines.push(`MFA enabled      : ${uc.mfaEnabled ? "Yes" : "No"}`);
-            lines.push(`Account enabled  : ${uc.accountEnabled ? "Yes" : "No"}`);
-            lines.push(`Impossible travel: ${uc.impossibleTravelDetected ? "Yes" : "No"}`);
-            lines.push(`Last sign-in     : ${uc.lastSignIn}`);
-            if (uc.privilegedRoles?.length > 0)
-              lines.push(`Privileged roles : ${uc.privilegedRoles.join(", ")}`);
-          }
-          break;
-
-        case "argus":
-          if (campaign) {
-            lines.push(`Customer environments: ${campaign.numberOfCustomerEnvironments}`);
-            lines.push(`Campaign likelihood  : ${campaign.campaignLikelihood}`);
-            lines.push(`Affected devices     : ${campaign.numberOfAffectedDevices}`);
-            lines.push(`Affected users       : ${campaign.numberOfAffectedUsers}`);
-            lines.push(`First observed       : ${campaign.firstObserved?.slice(0, 10)}`);
-            lines.push(`Last observed        : ${campaign.lastObserved?.slice(0, 10)}`);
-            lines.push(`Spike (24h)          : ${campaign.spikeDetectedLast24h ? "Yes" : "No"}`);
-            const ips = [...new Set([...(vtInd?.relatedIps || []), ...(campaign.relatedIps || [])])].slice(0, 8);
-            if (ips.length > 0) lines.push(`Related IPs          : ${ips.join(", ")}`);
-            if (vtInd?.relatedHashes?.length > 0)
-              lines.push(`Related hashes       : ${vtInd.relatedHashes.slice(0, 6).map(h => h.hash ?? h).join(", ")}`);
-          }
-          break;
-
-        default:
-          break;
-      }
-      lines.push("");
-    }
-
-    return lines.join("\n");
-  }
 
   return (
     <div className="incident-detail-wrap">
@@ -1005,6 +959,18 @@ function IncidentDashboard({ incident, sectionChecks, onToggleSection, onNavigat
           <div>
             <h1 className="incident-title">{incident.title}</h1>
             <p className="incident-id">ID: {incident.id}</p>
+            <div className="incident-identity-row">
+              <span className="incident-identity-chip">
+                <span className="incident-identity-icon">⬡</span>
+                <span className="incident-identity-label">Device</span>
+                <span className="incident-identity-value">{incident.deviceName}</span>
+              </span>
+              <span className="incident-identity-chip">
+                <span className="incident-identity-icon">◎</span>
+                <span className="incident-identity-label">User</span>
+                <span className="incident-identity-value">{incident.user}</span>
+              </span>
+            </div>
           </div>
         </div>
         <div className="meta-table">
@@ -1017,57 +983,6 @@ function IncidentDashboard({ incident, sectionChecks, onToggleSection, onNavigat
         </div>
       </div>
       <hr className="summary-divider" />
-      <div className="dashboard-toolbar">
-        <div className="event-id-wrap">
-          <input
-            className="event-id-input"
-            type="text"
-            placeholder={(incident.id)}
-            value={eventIdInput}
-            onChange={e => { setEventIdInput(e.target.value); setEventIdStatus(null); }}
-            onKeyDown={handleEventIdKeyDown}
-          />
-          {eventIdStatus === "loading" && <span className="event-id-status">Loading…</span>}
-          {eventIdStatus === "not-found" && <span className="event-id-status event-id-status--err">Not found</span>}
-        </div>
-        <label className="weeks-filter-btn">
-          Data for the last
-          <input
-            className="weeks-num-input"
-            type="number"
-            min={1}
-            max={365}
-            value={daysFilter ?? ""}
-            placeholder="—"
-            onChange={e => {
-              const v = parseInt(e.target.value);
-              setDaysFilter(isNaN(v) ? null : Math.max(1, Math.min(365, v)));
-              if (!isNaN(v)) setWeeksFilter(2);
-            }}
-            onClick={e => e.target.select()}
-          />
-          {daysFilter === 1 ? "day" : "days"}
-        </label>
-        <label className="weeks-filter-btn">
-          Data for the last
-          <input
-            className="weeks-num-input"
-            type="number"
-            min={1}
-            max={52}
-            value={weeksFilter ?? ""}
-            placeholder="—"
-            onChange={e => {
-              const v = parseInt(e.target.value);
-              setWeeksFilter(isNaN(v) ? null : Math.max(1, Math.min(52, v)));
-              if (!isNaN(v)) setDaysFilter(null);
-            }}
-            onClick={e => e.target.select()}
-          />
-          {weeksFilter === 1 ? "week" : "weeks"}
-        </label>
-        <button className="btn-generate-report" onClick={() => { setReportText(buildReportText()); setReportOpen(true); }}>Generate report</button>
-      </div>
       <div className="dashboard-grid">
         {widgetOrder.map((key, idx) => {
           const def = widgetDefs[key];
@@ -1076,7 +991,6 @@ function IncidentDashboard({ incident, sectionChecks, onToggleSection, onNavigat
               key={key}
               title={def.title}
               className={def.full ? "widget--full" : ""}
-              {...(def.wcKey ? wc(def.wcKey) : {})}
               isDragOver={dropTargetIdx === idx}
               dragHandlers={makeDragHandlers(idx)}
             >
@@ -1085,7 +999,6 @@ function IncidentDashboard({ incident, sectionChecks, onToggleSection, onNavigat
           );
         })}
       </div>
-      {reportOpen && <ReportModal text={reportText} onClose={() => setReportOpen(false)} />}
     </div>
   );
 }
@@ -1132,19 +1045,6 @@ function App() {
   const [selectedId, setSelectedId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [lightMode, setLightMode] = useState(false);
-  const [sectionChecks, setSectionChecks] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("sectionChecks") || "{}"); }
-    catch { return {}; }
-  });
-
-  function toggleSection(incidentId, title) {
-    setSectionChecks((prev) => {
-      const key = `${incidentId}:${title}`;
-      const next = { ...prev, [key]: !prev[key] };
-      localStorage.setItem("sectionChecks", JSON.stringify(next));
-      return next;
-    });
-  }
 
   useEffect(() => {
     fetch(`${API}/api/incidents`)
@@ -1200,8 +1100,6 @@ function App() {
       </nav>
       <IncidentDashboard
         incident={data}
-        sectionChecks={sectionChecks}
-        onToggleSection={toggleSection}
         onNavigateToIncident={handleNavigateToIncident}
       />
     </div>

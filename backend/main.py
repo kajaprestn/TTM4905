@@ -14,9 +14,8 @@ import httpx
 from database import init_db, migrate_db, get_session
 from models import (
     Incident, Tenant, FileIntelligence, DeviceContext, UserContext,
-    CampaignContext, KQLQuery,
+    CampaignContext, KQLQuery, IpIntelligence, MachineAction,
 )
-from mde_ingest import get_mde_token, fetch_mde_alerts, map_alert_to_incident
 import json
 from seed_data import seed
 
@@ -304,6 +303,25 @@ def incident_to_api(inc: Incident) -> dict:
         "mdeIncidentId": inc.mde_incident_id,
         "description": inc.description,
         "mitreTechniques": json.loads(inc.mitre_techniques_json or "[]"),
+        "classification": inc.classification,
+        "determination": inc.determination,
+        "category": inc.category,
+        "detectionSource": inc.detection_source,
+        "threatName": inc.threat_name,
+        "assignedTo": inc.assigned_to,
+        "firstEventTime": inc.first_event_time,
+        "lastEventTime": inc.last_event_time,
+        "lastUpdateTime": inc.last_update_time,
+        "resolvedTime": inc.resolved_time,
+        "machineId": inc.machine_id,
+        "rbacGroupName": inc.rbac_group_name,
+        "parentProcessName": inc.parent_process_name,
+        "parentProcessPath": inc.parent_process_path,
+        "evidenceUrl": inc.evidence_url,
+        "registryKey": inc.registry_key,
+        "registryHive": inc.registry_hive,
+        "registryValue": inc.registry_value,
+        "comments": json.loads(inc.comments_json or "[]"),
     }
 
 
@@ -443,27 +461,6 @@ async def fetch_virustotal(file_hash: str) -> Optional[FileIntelligence]:
         vt_reputation_score=f"{reputation} (score: {rep_score})",
         vt_meaningful_name=meaningful_name,
         vt_tags_json=json.dumps(tags),
-        ms_classification="N/A",
-        ms_threat_family="N/A",
-        ms_prevalence="N/A",
-        ms_global_detection_level="N/A",
-        ms_cloud_protection_level="N/A",
-        seen_before="N/A",
-        first_seen_internally="N/A",
-        last_seen_internally="N/A",
-        number_of_affected_devices="N/A",
-        affected_devices_json="[]",
-        total_internal_detections="N/A",
-        seen_across_customers="N/A",
-        number_of_customer_environments="N/A",
-        first_observed_across_customers="N/A",
-        spike_detected_last_24h="N/A",
-        campaign_likelihood="N/A",
-        df_classification="N/A",
-        df_threat_family="N/A",
-        df_prevalence="N/A",
-        df_global_detection_level="N/A",
-        df_cloud_protection_level="N/A",
     )
 
 
@@ -624,6 +621,64 @@ def get_device_context(device_name: str, session: Session = Depends(get_session)
         "beaconingDetected": dc.beaconing_detected,
         "credentialDumpingDetected": dc.credential_dumping_detected,
         "lastSeen": dc.last_seen.isoformat(),
+        "firstSeen": dc.first_seen.isoformat() if dc.first_seen else None,
+        "lastIpAddress": dc.last_ip_address,
+        "lastExternalIpAddress": dc.last_external_ip_address,
+        "healthStatus": dc.health_status,
+        "deviceValue": dc.device_value,
+        "rbacGroupName": dc.rbac_group_name,
+        "machineTags": json.loads(dc.machine_tags_json or "[]"),
+        "onboardingStatus": dc.onboarding_status,
+        "osProcessor": dc.os_processor,
+        "osBuild": dc.os_build,
+        "osArchitecture": dc.os_architecture,
+        "managedBy": dc.managed_by,
+        "ipAddresses": json.loads(dc.ip_addresses_json or "[]"),
+        "vmMetadata": json.loads(dc.vm_metadata_json) if dc.vm_metadata_json else None,
+    }
+
+
+@app.get("/api/machine-actions/{machine_id}")
+def get_machine_actions(machine_id: str, session: Session = Depends(get_session)):
+    """Return machine actions for a device (isolations, AV scans, etc.)."""
+    actions = session.exec(
+        select(MachineAction).where(MachineAction.machine_id == machine_id)
+    ).all()
+    return [
+        {
+            "id": a.id,
+            "type": a.type,
+            "title": a.title,
+            "requestor": a.requestor,
+            "requestorComment": a.requestor_comment,
+            "status": a.status,
+            "machineId": a.machine_id,
+            "computerDnsName": a.computer_dns_name,
+            "creationDateTimeUtc": a.creation_datetime_utc,
+            "lastUpdateDateTimeUtc": a.last_update_datetime_utc,
+            "cancellationRequestor": a.cancellation_requestor,
+            "scope": a.scope,
+            "requestSource": a.request_source,
+            "commands": json.loads(a.commands_json or "[]"),
+        }
+        for a in actions
+    ]
+
+
+@app.get("/api/ip-stats/{ip_address}")
+def get_ip_stats(ip_address: str, session: Session = Depends(get_session)):
+    """Return MDE IP statistics for an IP address."""
+    stats = session.exec(
+        select(IpIntelligence).where(IpIntelligence.ip_address == ip_address)
+    ).first()
+    if not stats:
+        raise HTTPException(status_code=404, detail="No IP stats found")
+    return {
+        "ipAddress": stats.ip_address,
+        "orgPrevalence": stats.org_prevalence,
+        "organizationPrevalence": stats.organization_prevalence,
+        "orgFirstSeen": stats.org_first_seen,
+        "orgLastSeen": stats.org_last_seen,
     }
 
 
@@ -652,9 +707,12 @@ def get_user_context(user_principal_name: str, session: Session = Depends(get_se
 
 
 @app.get("/api/campaign-context")
-def list_campaign_contexts(session: Session = Depends(get_session)):
-    """Return all campaign context records."""
-    campaigns = session.exec(select(CampaignContext)).all()
+def list_campaign_contexts(file_hash: Optional[str] = None, session: Session = Depends(get_session)):
+    """Return campaign context records, optionally filtered by file hash."""
+    q = select(CampaignContext)
+    if file_hash:
+        q = q.where(CampaignContext.file_hash == file_hash)
+    campaigns = session.exec(q).all()
     return [
         {
             "campaignId": c.campaign_id,
@@ -771,75 +829,3 @@ def delete_tenant(tenant_id: int, session: Session = Depends(get_session)):
     session.delete(tenant)
     session.commit()
 
-
-# ---------------------------------------------------------------------------
-# MDE alert sync
-# ---------------------------------------------------------------------------
-
-async def _sync_tenant(tenant: Tenant, session: Session, lookback_hours: int) -> dict:
-    """Fetch MDE alerts for one tenant and upsert into the incidents table."""
-    client_id     = tenant.client_id     or AZURE_CLIENT_ID
-    client_secret = tenant.client_secret or AZURE_CLIENT_SECRET
-    if not client_id or not client_secret:
-        raise HTTPException(
-            status_code=400,
-            detail=f"No credentials for tenant '{tenant.display_name}'. "
-                   "Set clientId/clientSecret on the tenant or configure "
-                   "AZURE_CLIENT_ID/AZURE_CLIENT_SECRET env vars.",
-        )
-
-    token  = await get_mde_token(tenant.tenant_id, client_id, client_secret)
-    alerts = await fetch_mde_alerts(token, lookback_hours=lookback_hours)
-
-    new_count = updated_count = 0
-    for alert in alerts:
-        fields = map_alert_to_incident(alert)
-        existing = session.get(Incident, fields["id"])
-        if existing:
-            existing.status              = fields["status"]
-            existing.quarantine_status   = fields["quarantine_status"]
-            existing.detection_timestamp = fields["detection_timestamp"]
-            session.add(existing)
-            updated_count += 1
-        else:
-            session.add(Incident(**fields))
-            new_count += 1
-
-    from datetime import datetime, timezone
-    tenant.last_synced_at = datetime.now(timezone.utc)
-    session.add(tenant)
-    session.commit()
-
-    return {"tenant": tenant.display_name, "new": new_count, "updated": updated_count}
-
-
-@app.post("/api/tenants/{tenant_id}/sync")
-async def sync_tenant(
-    tenant_id: int,
-    lookback_hours: int = 168,
-    session: Session = Depends(get_session),
-):
-    """Pull MDE alerts for a single tenant (default: last 7 days)."""
-    tenant = session.get(Tenant, tenant_id)
-    if not tenant:
-        raise HTTPException(status_code=404, detail="Tenant not found")
-    return await _sync_tenant(tenant, session, lookback_hours)
-
-
-@app.post("/api/sync-all")
-async def sync_all_tenants(
-    lookback_hours: int = 168,
-    session: Session = Depends(get_session),
-):
-    """Pull MDE alerts for all active tenants."""
-    tenants = session.exec(select(Tenant).where(Tenant.is_active == True)).all()
-    if not tenants:
-        return {"results": [], "message": "No active tenants registered"}
-    results = []
-    for tenant in tenants:
-        try:
-            result = await _sync_tenant(tenant, session, lookback_hours)
-            results.append(result)
-        except Exception as e:
-            results.append({"tenant": tenant.display_name, "error": str(e)})
-    return {"results": results}

