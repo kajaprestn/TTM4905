@@ -1,0 +1,17 @@
+{
+    "comment": "from API explorer",
+    "@odata.context": "https://api-eu3.securitycenter.microsoft.com/api/$metadata#microsoft.windowsDefenderATP.api.InOrgFileStats",
+    "sha1": "f3d5fcaf72ef77e1dfad0cae23acd6d581611490",
+    "orgPrevalence": "1",
+    "organizationPrevalence": 1,
+    "orgFirstSeen": "2026-04-20T15:03:02.3524755Z",
+    "orgLastSeen": "2026-04-20T15:05:28.6466899Z",
+    "globalPrevalence": "3",
+    "globallyPrevalence": 3,
+    "globalFirstObserved": "2026-04-17T13:39:04.5611823Z",
+    "globalLastObserved": "2026-04-21T18:41:44.1286206Z",
+    "topFileNames": [
+      "winpeasx64.exe",
+      "winPEASx64.exe"
+    ]
+}

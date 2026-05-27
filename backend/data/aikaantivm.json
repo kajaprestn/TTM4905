@@ -1,0 +1,205 @@
+{
+    "comment": "collected from ms graph api",
+    "@odata.context": "https://graph.microsoft.com/v1.0/$metadata#security/alerts_v2/$entity",
+    "@microsoft.graph.tips": "Use $select to choose only the properties your app needs, as this can lead to performance improvements. For example: GET security/alerts_v2('<key>')?$select=actorDisplayName,additionalData",
+    "id": "dad50712b6-e83b-41c8-827e-8af5873236be_1",
+    "providerAlertId": "d50712b6-e83b-41c8-827e-8af5873236be_1",
+    "incidentId": "15609",
+    "status": "new",
+    "severity": "low",
+    "classification": null,
+    "determination": null,
+    "serviceSource": "microsoftDefenderForEndpoint",
+    "detectionSource": "antivirus",
+    "productName": "Microsoft Defender for Endpoint",
+    "detectorId": "ea8363c3-f787-447a-a0a6-e9120fe24fbb",
+    "tenantId": "335391db-0df6-4699-b48b-92a8feadccb5",
+    "title": "An active 'Aikaantivm' malware was detected",
+    "description": "Malware and unwanted software are undesirable applications that perform annoying, disruptive, or harmful actions on affected machines. Some of these undesirable applications can replicate and spread from one machine to another. Others are able to receive commands from remote attackers and perform activities associated with cyber attacks.\n\nA malware is considered active if it is found running on the machine or it already has persistence mechanisms in place. Active malware detections are assigned higher severity ratings.\n\nBecause this malware was active, take precautionary measures and check for residual signs of infection.",
+    "recommendedActions": "A. Validate the alert and scope the suspected breach.\n1. Find related machines, network addresses, and files in the incident graph.\n2. Check for other suspicious activities in the machine timeline.\n3. Locate unfamiliar processes in the process tree. Check files for prevalence, their locations, and digital signatures.\n4. Submit relevant files for deep analysis and review file behaviors. \n5. Identify unusual system activity with system owners. \n\nB. If you have validated the alert, contain and mitigate the breach.\n1. Record relevant artifacts, including those you need in mitigation rules.\n2. Stop suspicious processes. Block prevalent malware files across the network.\n3. Isolate affected machines.\n4. Identify potentially compromised accounts. If necessary, reset passwords and decommission accounts.\n5. Block relevant emails, websites, and IP addresses. Remove attack emails from mailboxes.\n6. Update antimalware signatures and run full scans. \n7. Deploy the latest security updates for Windows, web browsers, and other applications.\n\nC. Contact your incident response team, or contact Microsoft support for investigation and remediation services.",
+    "category": "Malware",
+    "assignedTo": null,
+    "alertWebUrl": "https://security.microsoft.com/alerts/dad50712b6-e83b-41c8-827e-8af5873236be_1?tid=335391db-0df6-4699-b48b-92a8feadccb5",
+    "incidentWebUrl": "https://security.microsoft.com/incident2/15609/overview?tid=335391db-0df6-4699-b48b-92a8feadccb5",
+    "actorDisplayName": null,
+    "threatDisplayName": "VirTool:MSIL/Aikaantivm.GG!MTB",
+    "threatFamilyName": "Aikaantivm",
+    "mitreTechniques": [],
+    "createdDateTime": "2026-04-20T15:06:27.41Z",
+    "lastUpdateDateTime": "2026-04-20T15:22:17.1266667Z",
+    "resolvedDateTime": null,
+    "firstActivityDateTime": "2026-04-20T15:03:06.449545Z",
+    "lastActivityDateTime": "2026-04-20T15:05:07.1167325Z",
+    "systemTags": [
+        "Critical asset"
+    ],
+    "alertPolicyId": null,
+    "investigationState": "terminatedBySystem",
+    "comments": [
+        {
+            "comment": "Collected alert to Argus",
+            "createdByDisplayName": "API Action",
+            "createdDateTime": "2026-04-20T15:22:17.1216762Z"
+        },
+        {
+            "comment": "Collected alert to Argus",
+            "createdByDisplayName": "API Action",
+            "createdDateTime": "2026-04-20T15:07:30.0217699Z"
+        }
+    ],
+    "customDetails": {},
+    "evidence": [
+        {
+            "@odata.type": "#microsoft.graph.security.deviceEvidence",
+            "createdDateTime": "2026-04-20T15:06:27.42Z",
+            "verdict": "suspicious",
+            "remediationStatus": "active",
+            "remediationStatusDetails": null,
+            "roles": [],
+            "detailedRoles": [
+                "PrimaryDevice"
+            ],
+            "tags": [],
+            "firstSeenDateTime": "2025-08-08T10:03:05.5462688Z",
+            "mdeDeviceId": "afd75be34dbbae255be8f9b9a0730bca80f4d0d7",
+            "azureAdDeviceId": null,
+            "deviceDnsName": "chrisr-lab-ws08.lab.local",
+            "hostName": "chrisr-lab-ws08",
+            "ntDomain": null,
+            "dnsDomain": "lab.local",
+            "osPlatform": "Windows10",
+            "osBuild": 19045,
+            "version": "22H2",
+            "healthStatus": "active",
+            "riskScore": "high",
+            "rbacGroupId": 220,
+            "rbacGroupName": "TRS LAB",
+            "onboardingStatus": "onboarded",
+            "defenderAvStatus": "unknown",
+            "lastIpAddress": "10.112.0.125",
+            "lastExternalIpAddress": "94.127.60.71",
+            "ipInterfaces": [],
+            "vmMetadata": null,
+            "loggedOnUsers": [
+                {
+                    "accountName": "chrisr",
+                    "domainName": "LAB"
+                }
+            ],
+            "resourceAccessEvents": []
+        },
+        {
+            "@odata.type": "#microsoft.graph.security.userEvidence",
+            "createdDateTime": "2026-04-20T15:06:27.42Z",
+            "verdict": "suspicious",
+            "remediationStatus": "active",
+            "remediationStatusDetails": null,
+            "roles": [],
+            "detailedRoles": [],
+            "tags": [
+                "Critical asset"
+            ],
+            "stream": null,
+            "userAccount": {
+                "accountName": "chrisr",
+                "domainName": "LAB",
+                "userSid": "S-1-5-21-1138737111-3342278614-2210987079-1001",
+                "azureAdUserId": null,
+                "userPrincipalName": "chrisr@lab.local",
+                "displayName": "chrisr",
+                "activeDirectoryObjectGuid": null,
+                "resourceAccessEvents": []
+            }
+        },
+        {
+            "@odata.type": "#microsoft.graph.security.fileEvidence",
+            "createdDateTime": "2026-04-20T15:06:27.42Z",
+            "verdict": "malicious",
+            "remediationStatus": "active",
+            "remediationStatusDetails": null,
+            "roles": [],
+            "detailedRoles": [],
+            "tags": [],
+            "detectionStatus": "detected",
+            "mdeDeviceId": "afd75be34dbbae255be8f9b9a0730bca80f4d0d7",
+            "fileDetails": {
+                "sha1": "f3d5fcaf72ef77e1dfad0cae23acd6d581611490",
+                "sha256": "a5e3ded4dff907d728cdb22d85f0ebfe65895189bc1b13983d6687d46476efe0",
+                "md5": "a0e1ff72d64f3c45281c26cf91c198cf",
+                "sha256Ac": null,
+                "fileName": "winPEASx64.exe",
+                "filePath": "C:\\ProgramData\\legit",
+                "fileSize": 11116032,
+                "filePublisher": null,
+                "signer": null,
+                "issuer": null
+            }
+        },
+        {
+            "@odata.type": "#microsoft.graph.security.ipEvidence",
+            "createdDateTime": "2026-04-20T15:06:27.42Z",
+            "verdict": "suspicious",
+            "remediationStatus": "active",
+            "remediationStatusDetails": null,
+            "roles": [],
+            "detailedRoles": [],
+            "tags": [],
+            "ipAddress": "10.0.38.66",
+            "countryLetterCode": null,
+            "stream": null,
+            "location": null
+        },
+        {
+            "@odata.type": "#microsoft.graph.security.processEvidence",
+            "createdDateTime": "2026-04-20T15:06:27.42Z",
+            "verdict": "malicious",
+            "remediationStatus": "active",
+            "remediationStatusDetails": null,
+            "roles": [],
+            "detailedRoles": [],
+            "tags": [],
+            "processId": 11460,
+            "parentProcessId": 11472,
+            "processCommandLine": "\"winPEASx64.exe\"",
+            "processCreationDateTime": "2026-04-20T15:04:01.9381866Z",
+            "parentProcessCreationDateTime": "2026-04-20T15:03:18.1491559Z",
+            "detectionStatus": "detected",
+            "mdeDeviceId": "afd75be34dbbae255be8f9b9a0730bca80f4d0d7",
+            "imageFile": {
+                "sha1": "f3d5fcaf72ef77e1dfad0cae23acd6d581611490",
+                "sha256": "a5e3ded4dff907d728cdb22d85f0ebfe65895189bc1b13983d6687d46476efe0",
+                "md5": null,
+                "sha256Ac": null,
+                "fileName": "winPEASx64.exe",
+                "filePath": "C:\\ProgramData\\legit",
+                "fileSize": 11116032,
+                "filePublisher": null,
+                "signer": null,
+                "issuer": null
+            },
+            "parentProcessImageFile": {
+                "sha1": null,
+                "sha256": null,
+                "md5": null,
+                "sha256Ac": null,
+                "fileName": "powershell.exe",
+                "filePath": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0",
+                "fileSize": 455680,
+                "filePublisher": "Microsoft Corporation",
+                "signer": null,
+                "issuer": null
+            },
+            "userAccount": {
+                "accountName": "chrisr",
+                "domainName": "LAB",
+                "userSid": "S-1-5-21-1138737111-3342278614-2210987079-1001",
+                "azureAdUserId": null,
+                "userPrincipalName": "chrisr@lab.local",
+                "displayName": "chrisr",
+                "activeDirectoryObjectGuid": null,
+                "resourceAccessEvents": []
+            }
+        }
+    ],
+    "additionalData": {}
+}

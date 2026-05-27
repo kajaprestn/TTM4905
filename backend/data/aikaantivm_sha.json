@@ -1,0 +1,21 @@
+{
+    "comment": "from API explorer",
+    "@odata.context": "https://api-eu3.securitycenter.microsoft.com/api/$metadata#Files/$entity",
+    "sha1": "f3d5fcaf72ef77e1dfad0cae23acd6d581611490",
+    "sha256": "a5e3ded4dff907d728cdb22d85f0ebfe65895189bc1b13983d6687d46476efe0",
+    "md5": "a0e1ff72d64f3c45281c26cf91c198cf",
+    "globalPrevalence": 3,
+    "globalFirstObserved": "2026-04-17T13:39:04.5611823Z",
+    "globalLastObserved": "2026-04-21T18:41:44.1286206Z",
+    "size": 11116032,
+    "fileType": null,
+    "isPeFile": true,
+    "filePublisher": null,
+    "fileProductName": null,
+    "signer": null,
+    "issuer": null,
+    "signerHash": null,
+    "isValidCertificate": null,
+    "determinationType": "Malware",
+    "determinationValue": "VirTool:MSIL/Aikaantivm!rfn"
+}

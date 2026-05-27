@@ -1,0 +1,16 @@
+{
+  "comment": "from API explorer",
+  "@odata.context": "https://api-eu3.securitycenter.microsoft.com/api/$metadata#microsoft.windowsDefenderATP.api.InOrgFileStats",
+  "sha1": "e3b6ea8c46fa831cec6f235a5cf48b38a4ae8d69",
+  "orgPrevalence": "1",
+  "organizationPrevalence": 1,
+  "orgFirstSeen": "2026-03-26T10:50:44.968647Z",
+  "orgLastSeen": "2026-04-20T14:54:00.5089516Z",
+  "globalPrevalence": "60138",
+  "globallyPrevalence": 60138,
+  "globalFirstObserved": "2022-09-19T17:17:08.1618017Z",
+  "globalLastObserved": "2026-04-22T16:32:56.7675664Z",
+  "topFileNames": [
+    "mimikatz.exe"
+  ]
+}

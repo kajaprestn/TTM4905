@@ -1,0 +1,21 @@
+{
+  "comment": "from API explorer",
+  "@odata.context": "https://api-eu3.securitycenter.microsoft.com/api/$metadata#Files/$entity",
+  "sha1": "e3b6ea8c46fa831cec6f235a5cf48b38a4ae8d69",
+  "sha256": "61c0810a23580cf492a6ba4f7654566108331e7a4134c968c2d6a05261b2d8a1",
+  "md5": "29efd64dd3c7fe1e2b022b7ad73a1ba5",
+  "globalPrevalence": 60138,
+  "globalFirstObserved": "2022-09-19T17:17:08.1618017Z",
+  "globalLastObserved": "2026-04-18T14:36:40.488547Z",
+  "size": 1355264,
+  "fileType": null,
+  "isPeFile": true,
+  "filePublisher": null,
+  "fileProductName": null,
+  "signer": null,
+  "issuer": null,
+  "signerHash": null,
+  "isValidCertificate": null,
+  "determinationType": "Malware",
+  "determinationValue": "HackTool:Win64/Mimikatz!MSR"
+}

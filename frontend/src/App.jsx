@@ -582,7 +582,7 @@ const effectiveDays = (weeksFilter ?? 2) * 7;
     ...(fi?.virusTotal?.popularThreatLabels ?? []),
   ].filter(Boolean);
 
-  const { data: descData } = useQuery({
+  const { data: descData, fetchStatus: descFetchStatus, isSuccess: descIsSuccess } = useQuery({
     queryKey: ["threat-description", threatFamily, vtHints.join(",")],
     queryFn: async () => {
       if (!threatFamily || threatFamily === "N/A") return null;
@@ -652,7 +652,10 @@ const effectiveDays = (weeksFilter ?? 2) * 7;
             ? <div className="threat-meaningful-name">{fi.virusTotal.meaningfulName}</div>
             : <div className="threat-meaningful-name" style={{ fontSize: "0.82rem" }}>{incident.microsoftSignature}</div>
           }
-          {threatDesc && <p className="threat-description">{threatDesc}</p>}
+          {threatDesc
+            ? <p className="threat-description">{threatDesc}</p>
+            : descIsSuccess && <p className="threat-description" style={{ color: "var(--color-label)", fontStyle: "italic" }}>No MITRE ATT&amp;CK documentation found for this threat.</p>
+          }
           {mitreUrl && (
             <a className="vt-link" href={mitreUrl} target="_blank" rel="noreferrer">
               ↗ View on MITRE ATT&CK

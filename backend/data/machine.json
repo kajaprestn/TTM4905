@@ -1,0 +1,59 @@
+{
+  "comment": "from API explorer",
+  "@odata.context": "https://api-eu3.securitycenter.microsoft.com/api/$metadata#Machines/$entity",
+  "id": "afd75be34dbbae255be8f9b9a0730bca80f4d0d7",
+  "mergedIntoMachineId": null,
+  "isPotentialDuplication": false,
+  "isExcluded": false,
+  "exclusionReason": null,
+  "computerDnsName": "chrisr-lab-ws08.lab.local",
+  "firstSeen": "2025-08-08T10:03:05.5462688Z",
+  "lastSeen": "2026-04-21T18:12:19.2669991Z",
+  "osPlatform": "Windows10",
+  "osProcessor": "x64",
+  "version": "22H2",
+  "lastIpAddress": "10.112.0.125",
+  "lastExternalIpAddress": "94.127.60.71",
+  "agentVersion": "10.8804.19045.6456",
+  "osBuild": 19045,
+  "healthStatus": "Active",
+  "deviceValue": "Normal",
+  "rbacGroupId": 220,
+  "rbacGroupName": "TRS LAB",
+  "riskScore": "High",
+  "exposureLevel": "High",
+  "isAadJoined": false,
+  "aadDeviceId": null,
+  "machineTags": [],
+  "onboardingStatus": "Onboarded",
+  "osArchitecture": "64-bit",
+  "managedBy": "MicrosoftDefenderForEndpoint",
+  "managedByStatus": "Success",
+  "ipAddresses": [
+    {
+      "ipAddress": "10.112.0.125",
+      "macAddress": "005056A5BF63",
+      "type": "Ethernet",
+      "operationalStatus": "Up"
+    },
+    {
+      "ipAddress": "fe80::be43:8b33:19f2:8c42",
+      "macAddress": "005056A5BF63",
+      "type": "Ethernet",
+      "operationalStatus": "Up"
+    },
+    {
+      "ipAddress": "127.0.0.1",
+      "macAddress": null,
+      "type": "SoftwareLoopback",
+      "operationalStatus": "Up"
+    },
+    {
+      "ipAddress": "::1",
+      "macAddress": null,
+      "type": "SoftwareLoopback",
+      "operationalStatus": "Up"
+    }
+  ],
+  "vmMetadata": null
+}

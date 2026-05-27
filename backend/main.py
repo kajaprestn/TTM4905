@@ -20,7 +20,6 @@ import json
 from seed_data import seed
 
 VT_API_KEY        = os.environ.get("VT_API_KEY", "")
-ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 ABUSEIPDB_API_KEY = os.environ.get("ABUSEIPDB_API_KEY", "")
 IPDATA_API_KEY    = os.environ.get("IPDATA_API_KEY", "")
 AZURE_CLIENT_ID     = os.environ.get("AZURE_CLIENT_ID", "")
@@ -233,27 +232,6 @@ async def _mitre_description(software_name: str) -> Optional[str]:
     return None
 
 
-async def _claude_description(category: str, software_name: str) -> str:
-    if not ANTHROPIC_API_KEY:
-        return f"Detected as {category} category threat based on behavioral and static analysis."
-    try:
-        import anthropic
-        client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
-        msg = client.messages.create(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=200,
-            messages=[{
-                "role": "user",
-                "content": (
-                    f"In 2-3 sentences, describe the cybersecurity threat '{software_name}' "
-                    f"(category: {category}). Focus on what it does and why it's dangerous. "
-                    "Be factual and concise."
-                ),
-            }],
-        )
-        return msg.content[0].text
-    except Exception:
-        return f"Detected as {category} category threat based on behavioral and static analysis."
 
 
 @asynccontextmanager
@@ -342,7 +320,6 @@ async def get_threat_description(family: str, hints: str = ""):
     if cache_key in _desc_cache:
         return {"description": _desc_cache[cache_key]}
 
-    category = family.split(":")[0]
     software_name = _extract_software_name(family)
 
     # Build candidate list: hints first (more specific), then signature-derived name
@@ -356,9 +333,7 @@ async def get_threat_description(family: str, hints: str = ""):
             break
 
     if not desc:
-        # Use the most specific name available for Claude
-        best_name = candidates[0] if candidates else software_name
-        desc = await _claude_description(category, best_name)
+        desc = None
 
     _desc_cache[cache_key] = desc
     return {"description": desc}
